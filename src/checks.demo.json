@@ -1,0 +1,58 @@
+[
+  {
+    "title": "BOLA: any caller can read any order",
+    "description": "GET /api/orders/1 returns another tenant's order with no ownership check and no credentials.",
+    "curl": "curl -i '{{baseUrl}}/api/orders/1'",
+    "regex": "\"owner\"\\s*:\\s*\"asha\"",
+    "severity": 9.5
+  },
+  {
+    "title": "Unauthenticated privileged configuration",
+    "description": "/api/admin/config is readable without a token and reports auth_required=false.",
+    "curl": "curl -i '{{baseUrl}}/api/admin/config'",
+    "regex": "\"auth_required\"\\s*:\\s*false|\"signing_key\"",
+    "severity": 9
+  },
+  {
+    "title": "Excessive data exposure on user profiles",
+    "description": "GET /api/users/101 returns password hashes, SSNs and internal notes with no field filtering.",
+    "curl": "curl -i '{{baseUrl}}/api/users/101'",
+    "regex": "password_hash|\"ssn\"|internal_notes",
+    "severity": 8
+  },
+  {
+    "title": "Verbose error leaks SQL and source paths",
+    "description": "/api/debug/error returns a SQL fragment, a stack frame and an absolute filesystem path.",
+    "curl": "curl -i '{{baseUrl}}/api/debug/error'",
+    "regex": "SQL syntax error|/srv/app/src",
+    "severity": 7
+  },
+  {
+    "title": "Unbounded page_size returns the whole dataset",
+    "description": "The caller controls page_size with no server-side maximum.",
+    "curl": "curl -i '{{baseUrl}}/api/search?page_size=9999'",
+    "regex": "\"page_size\"\\s*:\\s*9999",
+    "severity": 4
+  },
+  {
+    "title": "Login must not issue a refresh token",
+    "description": "Negative control — this API issues an access token only, so this should stay clear.",
+    "curl": "curl -i -X POST '{{baseUrl}}/api/login' -H 'Content-Type: application/json' --data '{\"username\":\"asha\",\"password\":\"demo\"}'",
+    "regex": "refresh_token",
+    "severity": 6
+  },
+  {
+    "title": "Service banner must not embed private key material",
+    "description": "Negative control — no key material is ever returned by the banner.",
+    "curl": "curl -i '{{baseUrl}}/'",
+    "regex": "-----BEGIN (RSA |EC )?PRIVATE KEY-----",
+    "severity": 8
+  },
+  {
+    "title": "Health check must not expose connection strings",
+    "description": "Negative control — the health route names dependencies but returns no DSNs.",
+    "curl": "curl -i '{{baseUrl}}/health'",
+    "regex": "postgres://|redis://|amqp://|rabbitmq://",
+    "severity": 5
+  }
+]

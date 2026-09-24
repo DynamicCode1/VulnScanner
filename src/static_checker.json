@@ -1,0 +1,942 @@
+{
+  "checks": [
+    {
+      "title": "Unnecessary HTTP methods enabled",
+      "description": "The server may accept HTTP methods that the API does not need. Assess against the API's documented method allowlist.",
+      "curl": "curl -i --max-time 10 -X TRACE '{{baseUrl}}/'",
+      "regex": "(?im)^HTTP/\\S+\\s+(?!405\\b|501\\b)\\d{3}\\b",
+      "severity": 4
+    },
+    {
+      "title": "HTTP OPTIONS reveals excessive methods",
+      "description": "The API may advertise methods that are not required for the endpoint.",
+      "curl": "curl -i --max-time 10 -X OPTIONS '{{baseUrl}}/'",
+      "regex": "(?im)^allow:\\s*[^\\r\\n]*(TRACE|CONNECT|TRACK|PUT|DELETE)",
+      "severity": 4
+    },
+    {
+      "title": "HTTP method override is enabled",
+      "description": "A proxy or application may honor method-override headers, which can bypass controls that only inspect the original method.",
+      "curl": "curl -i --max-time 10 -X POST -H 'X-HTTP-Method-Override: OPTIONS' '{{baseUrl}}/__replace_with_authorized_route__'",
+      "regex": "(?im)^HTTP/\\S+\\s+(?!400\\b|403\\b|404\\b|405\\b|501\\b)\\d{3}\\b",
+      "severity": 5
+    },
+    {
+      "title": "Unsupported request content type is accepted",
+      "description": "The API may process a body using an unexpected media type rather than rejecting it.",
+      "curl": "curl -i --max-time 10 -X POST -H 'Content-Type: text/plain' --data 'scanner_probe' '{{baseUrl}}/__replace_with_safe_test_route__'",
+      "regex": "(?m)^HTTP/\\S+\\s+2\\d\\d\\b",
+      "severity": 5
+    },
+    {
+      "title": "Unsupported response media type is returned",
+      "description": "The API may ignore the client's Accept header and return a response format that clients or security controls do not expect.",
+      "curl": "curl -i --max-time 10 -H 'Accept: application/xml' '{{baseUrl}}/__replace_with_read_only_route__'",
+      "regex": "(?im)^content-type:\\s*(?!application/xml)[^\\r\\n]+",
+      "severity": 2
+    },
+    {
+      "title": "Response Content-Type header missing",
+      "description": "A response with a body may not declare its media type, increasing ambiguity for clients and intermediaries.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)^(?![\\s\\S]*\\r?\\ncontent-type:)",
+      "severity": 3
+    },
+    {
+      "title": "MIME sniffing protection missing",
+      "description": "Browser-facing responses may omit X-Content-Type-Options: nosniff, allowing browsers to infer content types.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)^(?![\\s\\S]*\\r?\\nx-content-type-options:\\s*nosniff)",
+      "severity": 3
+    },
+    {
+      "title": "HSTS header missing",
+      "description": "HTTPS responses may omit Strict-Transport-Security, so browsers may not be instructed to use HTTPS on future visits.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)^(?![\\s\\S]*\\r?\\nstrict-transport-security:)",
+      "severity": 3
+    },
+    {
+      "title": "HSTS max-age is too short or zero",
+      "description": "The HSTS policy may have a zero or very short max-age, reducing its protection.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^strict-transport-security:\\s*[^\\r\\n]*max-age=(0|[1-9]\\d{0,5})(?:\\D|$)",
+      "severity": 3
+    },
+    {
+      "title": "HSTS subdomain policy absent",
+      "description": "The HSTS header may omit includeSubDomains even when all relevant subdomains are HTTPS-only.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^strict-transport-security:\\s*(?![^\\r\\n]*includesubdomains)[^\\r\\n]+",
+      "severity": 2
+    },
+    {
+      "title": "Content Security Policy missing on HTML response",
+      "description": "An API response that serves HTML may lack a Content-Security-Policy, reducing browser-side content restrictions.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)^(?![\\s\\S]*\\r?\\ncontent-security-policy:)",
+      "severity": 3
+    },
+    {
+      "title": "Referrer-Policy header missing",
+      "description": "Browser-facing responses may omit a Referrer-Policy that limits referrer information sent to other sites.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)^(?![\\s\\S]*\\r?\\nreferrer-policy:)",
+      "severity": 2
+    },
+    {
+      "title": "Permissions-Policy header missing",
+      "description": "Browser-facing responses may not restrict browser features through a Permissions-Policy header.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)^(?![\\s\\S]*\\r?\\npermissions-policy:)",
+      "severity": 1
+    },
+    {
+      "title": "Clickjacking protection missing on HTML response",
+      "description": "HTML responses may lack frame restrictions through CSP frame-ancestors or X-Frame-Options.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)^(?![\\s\\S]*\\r?\\nx-frame-options:)(?![\\s\\S]*\\r?\\ncontent-security-policy:[^\\r\\n]*frame-ancestors)",
+      "severity": 3
+    },
+    {
+      "title": "Server identity header exposed",
+      "description": "The Server response header may disclose server software or version information.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^server:\\s*[^\\r\\n]+",
+      "severity": 2
+    },
+    {
+      "title": "Technology disclosure header exposed",
+      "description": "Framework-specific response headers may disclose implementation details.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^(x-powered-by|x-aspnet-version|x-generator):\\s*[^\\r\\n]+",
+      "severity": 2
+    },
+    {
+      "title": "Internal proxy headers exposed in response",
+      "description": "Response headers may reveal internal proxy, routing, or infrastructure details.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^(x-backend-server|x-upstream|x-served-by|via|x-cache):\\s*[^\\r\\n]+",
+      "severity": 2
+    },
+    {
+      "title": "Cross-origin resource policy is permissive",
+      "description": "Cross-Origin-Resource-Policy may allow resources to be embedded across sites when a stricter policy is intended.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^cross-origin-resource-policy:\\s*(cross-origin|unsafe-none)",
+      "severity": 3
+    },
+    {
+      "title": "Cross-origin opener policy is permissive",
+      "description": "Cross-Origin-Opener-Policy may be absent or permissive on browser-facing pages that need browsing-context isolation.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^cross-origin-opener-policy:\\s*unsafe-none",
+      "severity": 2
+    },
+    {
+      "title": "CORS allows all methods",
+      "description": "The CORS policy may permit every HTTP method, including methods the browser client does not need.",
+      "curl": "curl -i --max-time 10 -X OPTIONS -H 'Origin: https://scanner.invalid' -H 'Access-Control-Request-Method: DELETE' '{{baseUrl}}/'",
+      "regex": "(?im)^access-control-allow-methods:\\s*[^\\r\\n]*\\*",
+      "severity": 5
+    },
+    {
+      "title": "CORS allows sensitive methods to untrusted origins",
+      "description": "The CORS policy may allow state-changing methods to a caller-supplied origin.",
+      "curl": "curl -i --max-time 10 -X OPTIONS -H 'Origin: https://scanner.invalid' -H 'Access-Control-Request-Method: DELETE' '{{baseUrl}}/'",
+      "regex": "(?im)^access-control-allow-methods:\\s*[^\\r\\n]*(DELETE|PUT|PATCH)",
+      "severity": 5
+    },
+    {
+      "title": "CORS allows all request headers",
+      "description": "The CORS policy may allow arbitrary request headers from browser clients.",
+      "curl": "curl -i --max-time 10 -X OPTIONS -H 'Origin: https://scanner.invalid' -H 'Access-Control-Request-Method: GET' -H 'Access-Control-Request-Headers: x-scanner-probe' '{{baseUrl}}/'",
+      "regex": "(?im)^access-control-allow-headers:\\s*[^\\r\\n]*\\*",
+      "severity": 4
+    },
+    {
+      "title": "CORS exposes sensitive response headers",
+      "description": "The API may expose internal or security-sensitive response headers to browser JavaScript.",
+      "curl": "curl -i --max-time 10 -H 'Origin: https://scanner.invalid' '{{baseUrl}}/'",
+      "regex": "(?im)^access-control-expose-headers:\\s*[^\\r\\n]*(set-cookie|authorization|x-api-key|x-internal|x-auth)",
+      "severity": 4
+    },
+    {
+      "title": "CORS preflight cache duration is excessive",
+      "description": "A long Access-Control-Max-Age may keep a permissive preflight policy cached in browsers after configuration changes.",
+      "curl": "curl -i --max-time 10 -X OPTIONS -H 'Origin: https://scanner.invalid' -H 'Access-Control-Request-Method: GET' '{{baseUrl}}/'",
+      "regex": "(?im)^access-control-max-age:\\s*(\\d{6,}|[3-9]\\d{4,})\\s*$",
+      "severity": 2
+    },
+    {
+      "title": "Cookie missing Secure attribute",
+      "description": "A cookie may be sent over cleartext HTTP if its Secure attribute is absent.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^set-cookie:(?![^\\r\\n]*;\\s*secure(?:;|\\s|$))[^\\r\\n]+",
+      "severity": 5
+    },
+    {
+      "title": "Cookie missing HttpOnly attribute",
+      "description": "A session or authentication cookie may be accessible to client-side scripts if HttpOnly is absent.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^set-cookie:(?![^\\r\\n]*;\\s*httponly(?:;|\\s|$))[^\\r\\n]+",
+      "severity": 5
+    },
+    {
+      "title": "Cookie SameSite attribute missing or unrestricted",
+      "description": "A session cookie may lack a SameSite restriction or use SameSite=None, increasing cross-site request exposure.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^set-cookie:(?![^\\r\\n]*;\\s*samesite=(strict|lax)(?:;|\\s|$))[^\\r\\n]+",
+      "severity": 4
+    },
+    {
+      "title": "Cookie has an overly broad Domain attribute",
+      "description": "A cookie may be shared with sibling subdomains through a broad Domain attribute.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^set-cookie:[^\\r\\n]*;\\s*domain=\\.[^;\\r\\n]+",
+      "severity": 4
+    },
+    {
+      "title": "Cookie has an overly broad Path attribute",
+      "description": "A cookie may be available to more application paths than required.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^set-cookie:[^\\r\\n]*;\\s*path=/\\s*(?:;|$)",
+      "severity": 2
+    },
+    {
+      "title": "Cross-origin resource sharing origin varies without Vary header",
+      "description": "A server that returns different CORS headers per origin may omit Vary: Origin, risking incorrect shared-cache behavior.",
+      "curl": "curl -i --max-time 10 -H 'Origin: https://scanner.invalid' '{{baseUrl}}/'",
+      "regex": "(?im)^access-control-allow-origin:\\s*https://scanner\\.invalid\\s*$",
+      "severity": 4
+    },
+    {
+      "title": "Proxy trust configuration may accept spoofed client IP",
+      "description": "The service may trust forwarded client-IP headers from untrusted callers, affecting IP-based controls or logging.",
+      "curl": "curl -i --max-time 10 -H 'X-Forwarded-For: 192.0.2.123' '{{baseUrl}}/__replace_with_read_only_route__'",
+      "regex": "(?i)(192\\.0\\.2\\.123)",
+      "severity": 5
+    },
+    {
+      "title": "Host header may influence generated response URLs",
+      "description": "The application may use an untrusted Host header when generating redirects, links, or password-reset URLs.",
+      "curl": "curl -i --max-time 10 -H 'Host: scanner.invalid' '{{baseUrl}}/__replace_with_safe_route__'",
+      "regex": "(?i)(location: https?://scanner\\.invalid|https?://scanner\\.invalid)",
+      "severity": 6
+    },
+    {
+      "title": "Forwarded host header may influence generated URLs",
+      "description": "The application may trust an untrusted X-Forwarded-Host value when constructing absolute URLs.",
+      "curl": "curl -i --max-time 10 -H 'X-Forwarded-Host: scanner.invalid' '{{baseUrl}}/__replace_with_safe_route__'",
+      "regex": "(?i)(location: https?://scanner\\.invalid|https?://scanner\\.invalid)",
+      "severity": 6
+    },
+    {
+      "title": "Proxy protocol mismatch may expose backend behavior",
+      "description": "The API may respond differently to forwarded protocol headers, indicating inconsistent proxy trust or HTTPS enforcement.",
+      "curl": "curl -i --max-time 10 -H 'X-Forwarded-Proto: http' '{{baseUrl}}/__replace_with_safe_route__'",
+      "regex": "(?i)(location:\\s*http://|http://api\\.example\\.com)",
+      "severity": 5
+    },
+    {
+      "title": "HTTP TRACE method may be enabled",
+      "description": "TRACE can reflect request headers and is generally unnecessary for an API.",
+      "curl": "curl -i --max-time 10 -X TRACE '{{baseUrl}}/'",
+      "regex": "(?is)^HTTP/\\S+\\s+2\\d\\d[\\s\\S]*(?:TRACE|scanner-probe)",
+      "severity": 4
+    },
+    {
+      "title": "HTTP TRACK method may be enabled",
+      "description": "TRACK is an unnecessary legacy method and should generally be rejected.",
+      "curl": "curl -i --max-time 10 -X TRACK '{{baseUrl}}/'",
+      "regex": "(?m)^HTTP/\\S+\\s+2\\d\\d\\b",
+      "severity": 3
+    },
+    {
+      "title": "HTTP CONNECT method may be enabled",
+      "description": "CONNECT should not normally be accepted by an API origin server.",
+      "curl": "curl -i --max-time 10 -X CONNECT '{{baseUrl}}/'",
+      "regex": "(?m)^HTTP/\\S+\\s+2\\d\\d\\b",
+      "severity": 5
+    },
+    {
+      "title": "WebDAV methods may be enabled",
+      "description": "WebDAV methods such as PROPFIND or MKCOL may expose unnecessary file-management functionality.",
+      "curl": "curl -i --max-time 10 -X PROPFIND '{{baseUrl}}/'",
+      "regex": "(?m)^HTTP/\\S+\\s+(?!405\\b|501\\b)\\d{3}\\b",
+      "severity": 5
+    },
+    {
+      "title": "HTTP method response differs across gateway and backend",
+      "description": "A method accepted by one layer and rejected by another can indicate inconsistent request filtering.",
+      "curl": "curl -i --max-time 10 -X PATCH '{{baseUrl}}/__replace_with_documented_route__'",
+      "regex": "(?im)^allow:\\s*[^\\r\\n]+",
+      "severity": 4
+    },
+    {
+      "title": "Content negotiation may permit unsafe XML parsing",
+      "description": "An endpoint may accept XML despite only requiring JSON, potentially enabling XML parser risks if parser features are unsafe.",
+      "curl": "curl -i --max-time 10 -X POST -H 'Content-Type: application/xml' --data '<probe>safe</probe>' '{{baseUrl}}/__replace_with_safe_test_endpoint__'",
+      "regex": "(?m)^HTTP/\\S+\\s+2\\d\\d\\b",
+      "severity": 5
+    },
+    {
+      "title": "XML external entity feature may be enabled",
+      "description": "The service may use an XML parser configured to resolve external entities. Confirm through configuration review or a controlled test environment.",
+      "curl": "curl -i --max-time 10 -X POST -H 'Content-Type: application/xml' --data '<!DOCTYPE probe [<!ENTITY x SYSTEM \"file:///etc/hostname\">]><probe>&x;</probe>' '{{baseUrl}}/__replace_with_staging_xml_endpoint__'",
+      "regex": "(?i)(DOCTYPE is disallowed|external entity|file:///etc/hostname)",
+      "severity": 8
+    },
+    {
+      "title": "GraphQL introspection may be enabled",
+      "description": "GraphQL schema introspection may expose types and operations. Whether this is a fault depends on exposure and access policy.",
+      "curl": "curl -i --max-time 10 -X POST -H 'Content-Type: application/json' --data '{\"query\":\"{__schema{types{name}}}\"}' '{{baseUrl}}/graphql'",
+      "regex": "(?i)(\"__schema\"\\s*:|\"types\"\\s*:|\"kind\"\\s*:\\s*\"OBJECT\")",
+      "severity": 3
+    },
+    {
+      "title": "GraphQL query depth or complexity controls may be absent",
+      "description": "The GraphQL service may accept deeply nested queries without suitable depth or cost limits.",
+      "curl": "curl -i --max-time 10 -X POST -H 'Content-Type: application/json' --data '{\"query\":\"{__typename}\"}' '{{baseUrl}}/graphql'",
+      "regex": "(?i)(complexity limit|depth limit|query cost limit)",
+      "severity": 4
+    },
+    {
+      "title": "GraphQL batching may be enabled without limits",
+      "description": "The service may accept batched GraphQL operations without a suitable batch-size limit.",
+      "curl": "curl -i --max-time 10 -X POST -H 'Content-Type: application/json' --data '[{\"query\":\"{__typename}\"},{\"query\":\"{__typename}\"}]' '{{baseUrl}}/graphql'",
+      "regex": "(?m)^HTTP/\\S+\\s+2\\d\\d\\b",
+      "severity": 4
+    },
+    {
+      "title": "GraphQL playground may be exposed",
+      "description": "An interactive GraphQL console may be accessible in production and reveal schema or enable operations.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/graphiql'",
+      "regex": "(?i)(graphiql|graphql playground|GraphiQL\\.createFetcher)",
+      "severity": 3
+    },
+    {
+      "title": "gRPC reflection may be exposed",
+      "description": "The gRPC reflection service may reveal service and method definitions to clients.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)(grpc\\.reflection\\.v1alpha|grpc\\.reflection\\.v1)",
+      "severity": 3
+    },
+    {
+      "title": "WebSocket origin checks may be missing",
+      "description": "The WebSocket service may accept browser connections from an untrusted Origin. Confirm through a valid handshake in an authorized test.",
+      "curl": "curl -i --max-time 10 -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Origin: https://scanner.invalid' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' '{{baseUrl}}/__replace_with_websocket_route__'",
+      "regex": "(?im)^HTTP/\\S+\\s+101\\s+Switching Protocols",
+      "severity": 6
+    },
+    {
+      "title": "WebSocket endpoint may permit unauthenticated connection",
+      "description": "A WebSocket handshake may succeed without credentials where the endpoint is expected to be private.",
+      "curl": "curl -i --max-time 10 -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' '{{baseUrl}}/__replace_with_known_private_websocket_route__'",
+      "regex": "(?im)^HTTP/\\S+\\s+101\\s+Switching Protocols",
+      "severity": 8
+    },
+    {
+      "title": "Webhook endpoint may not require signatures",
+      "description": "A webhook receiver may accept requests without a verified signature, allowing forged event submissions.",
+      "curl": "curl -i --max-time 10 -X POST -H 'Content-Type: application/json' --data '{\"event\":\"scanner_probe\"}' '{{baseUrl}}/__replace_with_authorized_webhook_test_route__'",
+      "regex": "(?m)^HTTP/\\S+\\s+2\\d\\d\\b",
+      "severity": 7
+    },
+    {
+      "title": "Webhook replay protection may be absent",
+      "description": "The receiver may not enforce event timestamps or replay identifiers. Confirm using an approved staging event and signature.",
+      "curl": "curl -i --max-time 10 -X POST -H 'Content-Type: application/json' -H 'X-Webhook-Timestamp: 0' -H 'X-Webhook-Id: scanner-replay-probe' --data '{\"event\":\"scanner_probe\"}' '{{baseUrl}}/__replace_with_staging_webhook_route__'",
+      "regex": "(?m)^HTTP/\\S+\\s+2\\d\\d\\b",
+      "severity": 6
+    },
+    {
+      "title": "Webhook signature header is not enforced",
+      "description": "A webhook may accept requests without a signature header or equivalent authenticated delivery proof.",
+      "curl": "curl -i --max-time 10 -X POST -H 'Content-Type: application/json' --data '{\"event\":\"scanner_probe\"}' '{{baseUrl}}/__replace_with_staging_webhook_route__'",
+      "regex": "(?m)^HTTP/\\S+\\s+2\\d\\d\\b",
+      "severity": 7
+    },
+    {
+      "title": "Unrestricted redirect target may be configured",
+      "description": "A redirect parameter may allow arbitrary external destinations when only trusted destinations should be permitted.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_known_redirect_route__?next=https%3A%2F%2Fscanner.invalid'",
+      "regex": "(?im)^location:\\s*https?://scanner\\.invalid(?:/|\\s|$)",
+      "severity": 5
+    },
+    {
+      "title": "Health endpoint returns detailed dependency status",
+      "description": "A health check may expose database, queue, or downstream service names and status to unauthenticated callers.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/health'",
+      "regex": "(?i)(database|redis|kafka|rabbitmq|postgres|mysql|dependency|downstream|connection string)",
+      "severity": 4
+    },
+    {
+      "title": "API version or build metadata exposed",
+      "description": "Version endpoints may expose build identifiers, commit hashes, or deployment details useful for reconnaissance.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/version'",
+      "regex": "(?i)\"?(commit|build[_ -]?id|git[_ -]?sha|revision|release|version)\"?\\s*[:=]",
+      "severity": 2
+    },
+    {
+      "title": "Source map or source bundle may be exposed",
+      "description": "A publicly accessible source map can reveal original source paths or embedded source content.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_known_bundle__.js.map'",
+      "regex": "(?i)(\"sourcesContent\"\\s*:|\"sources\"\\s*:\\s*\\[)",
+      "severity": 4
+    },
+    {
+      "title": "Directory listing may be enabled",
+      "description": "A web server may list files in an exposed directory, potentially revealing configuration or backup artifacts.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_known_directory_path__/'",
+      "regex": "(?i)(index of /|directory listing for|parent directory)",
+      "severity": 5
+    },
+    {
+      "title": "Backup or configuration artifact may be exposed",
+      "description": "A known, in-scope backup or configuration path may be publicly downloadable. Avoid broad path guessing.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_known_artifact_path__'",
+      "regex": "(?i)(BEGIN (RSA |EC )?PRIVATE KEY|database_url|client_secret|password\\s*[:=])",
+      "severity": 9
+    },
+    {
+      "title": "API gateway may expose a backend bypass route",
+      "description": "A backend service may be directly reachable outside the gateway's authentication or filtering controls. Requires infrastructure inventory to identify the backend.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_documented_backend_health_route__'",
+      "regex": "(?i)(backend|upstream|internal service|gateway)",
+      "severity": 8
+    },
+    {
+      "title": "Cross-origin policy permits null origin",
+      "description": "The API may allow the special null Origin used by sandboxed documents and some local contexts.",
+      "curl": "curl -i --max-time 10 -H 'Origin: null' '{{baseUrl}}/'",
+      "regex": "(?im)^access-control-allow-origin:\\s*null\\s*$",
+      "severity": 5
+    },
+    {
+      "title": "CORS allows an unencrypted origin",
+      "description": "The CORS policy may trust an HTTP origin, allowing browser requests from an unencrypted site.",
+      "curl": "curl -i --max-time 10 -H 'Origin: http://scanner.invalid' '{{baseUrl}}/'",
+      "regex": "(?im)^access-control-allow-origin:\\s*http://scanner\\.invalid\\s*$",
+      "severity": 5
+    },
+    {
+      "title": "Sensitive response lacks no-store cache directive",
+      "description": "A sensitive response may omit Cache-Control: no-store and remain in browser or intermediary caches.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/__replace_with_authorized_sensitive_read_route__'",
+      "regex": "(?im)^cache-control:(?![^\\r\\n]*no-store)[^\\r\\n]*",
+      "severity": 5
+    },
+    {
+      "title": "Pragma no-cache directive missing on sensitive response",
+      "description": "A sensitive response may omit the legacy Pragma: no-cache directive for compatibility with older intermediaries.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/__replace_with_authorized_sensitive_read_route__'",
+      "regex": "(?i)^(?![\\s\\S]*\\r?\\npragma:\\s*no-cache)",
+      "severity": 2
+    },
+    {
+      "title": "Cache response varies by authorization without Vary",
+      "description": "A response that changes based on Authorization may lack Vary: Authorization, which can cause shared-cache mix-ups.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 -H 'Authorization: Bearer __approved_test_token__' '{{baseUrl}}/__replace_with_authorized_read_route__'",
+      "regex": "(?i)^(?![\\s\\S]*\\r?\\nvary:[^\\r\\n]*authorization)",
+      "severity": 5
+    },
+    {
+      "title": "TLS certificate validation failure",
+      "description": "The endpoint may present an expired, mismatched, or untrusted certificate. curl normally fails certificate validation; do not disable verification.",
+      "curl": "curl -Iv --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)(certificate has expired|certificate subject name .* does not match|unable to get local issuer certificate|SSL certificate problem)",
+      "severity": 8
+    },
+    {
+      "title": "TLS certificate nearing expiration",
+      "description": "The endpoint certificate may be close to expiry. Use a TLS-aware scanner or certificate inspection for accurate dates.",
+      "curl": "curl -Iv --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)(expire date|notAfter)",
+      "severity": 3
+    },
+    {
+      "title": "TLS renegotiation or legacy protocol support",
+      "description": "The TLS endpoint may support legacy protocol behavior. Validate with a dedicated TLS scanner and current policy.",
+      "curl": "curl -Iv --tlsv1.0 --tls-max 1.0 --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)(SSL connection using TLSv1\\.0|SSL connection established)",
+      "severity": 6
+    },
+    {
+      "title": "API accepts plain HTTP on an alternate listener",
+      "description": "An alternate port or hostname may serve the API over HTTP even if the primary endpoint uses HTTPS.",
+      "curl": "curl -i --max-time 10 '{{httpBaseUrl}}/__replace_with_safe_route__'",
+      "regex": "(?m)^HTTP/\\S+\\s+2\\d\\d\\b",
+      "severity": 7
+    },
+    {
+      "title": "Cache-control header is duplicated or contradictory",
+      "description": "Multiple conflicting Cache-Control headers may be interpreted differently by proxies and clients.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/__replace_with_read_only_route__'",
+      "regex": "(?im)(^cache-control:.*\\r?\\n.*^cache-control:|^cache-control:[^\\r\\n]*(public.*private|no-store.*public|private.*public))",
+      "severity": 4
+    },
+    {
+      "title": "Content-Security-Policy permits unsafe script execution",
+      "description": "HTML responses may use CSP directives such as unsafe-inline or unsafe-eval, weakening script restrictions.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^content-security-policy:[^\\r\\n]*\\b(unsafe-inline|unsafe-eval)\\b",
+      "severity": 4
+    },
+    {
+      "title": "Content-Security-Policy permits all sources",
+      "description": "A CSP policy may contain wildcard sources for scripts or default content, weakening its restrictions.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^content-security-policy:[^\\r\\n]*(default-src|script-src)\\s+[^;]*\\*",
+      "severity": 4
+    },
+    {
+      "title": "Reflected request header appears in response",
+      "description": "The API may reflect caller-controlled headers, which can indicate unsafe proxy or response construction behavior.",
+      "curl": "curl -i --max-time 10 -H 'X-Scanner-Probe: scanner-probe-7f29' '{{baseUrl}}/__replace_with_safe_route__'",
+      "regex": "(?i)scanner-probe-7f29",
+      "severity": 3
+    },
+    {
+      "title": "Error response reveals database or query details",
+      "description": "An error may disclose database product names, query fragments, table names, or connection details.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_known_invalid_parameter__?id=invalid'",
+      "regex": "(?i)(syntax error.*(sql|query)|\\b(select|insert|update|delete)\\b.*\\b(from|into|where)\\b|postgresql|mysql|mongodb|connection string)",
+      "severity": 7
+    },
+    {
+      "title": "Error response reveals filesystem paths",
+      "description": "Errors may expose absolute paths or application directory structure.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_known_invalid_route__'",
+      "regex": "(?i)([A-Z]:\\\\[\\w\\\\.-]+|/(var|home|srv|opt|app|usr)/[\\w/.-]+)",
+      "severity": 4
+    },
+    {
+      "title": "Error response reveals internal hostnames or addresses",
+      "description": "Errors may disclose private hostnames, internal IP addresses, or service topology.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_known_invalid_route__'",
+      "regex": "(?i)(\\b10(?:\\.\\d{1,3}){3}\\b|\\b192\\.168(?:\\.\\d{1,3}){2}\\b|\\b172\\.(?:1[6-9]|2\\d|3[01])(?:\\.\\d{1,3}){2}\\b|\\b[a-z0-9-]+\\.internal\\b)",
+      "severity": 4
+    },
+    {
+      "title": "API response includes diagnostic correlation details",
+      "description": "Responses may reveal trace identifiers or diagnostic internals beyond a safe opaque request ID.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_safe_route__'",
+      "regex": "(?i)(exceptionId|stackTraceId|diagnosticDump|traceback|internalTrace)",
+      "severity": 2
+    },
+    {
+      "title": "Potential response splitting through header reflection",
+      "description": "A service or intermediary may improperly reflect newline-containing input into response headers. Test only in a controlled environment.",
+      "curl": "curl -i --max-time 10 -H $'X-Scanner-Probe: safe%0d%0aX-Scanner-Injected: yes' '{{baseUrl}}/__replace_with_safe_route__'",
+      "regex": "(?im)^x-scanner-injected:\\s*yes\\s*$",
+      "severity": 7
+    },
+    {
+      "title": "Content type does not match returned body",
+      "description": "The response Content-Type may not match its actual content, potentially triggering unsafe client parsing.",
+      "curl": "curl -sS -D - --max-time 10 '{{baseUrl}}/__replace_with_read_only_route__'",
+      "regex": "(?is)^HTTP/[^\\r\\n]+\\r?\\n(?:(?!\\r?\\n).)*content-type:\\s*application/json.*\\r?\\n\\r?\\n\\s*<(html|\\?xml)",
+      "severity": 3
+    },
+    {
+      "title": "JSONP callback support may be enabled",
+      "description": "A legacy callback parameter may wrap JSON in executable JavaScript rather than returning JSON only.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_read_only_route__?callback=scannerProbe'",
+      "regex": "(?is)^HTTP/\\S+\\s+2\\d\\d[\\s\\S]*scannerProbe\\s*\\(",
+      "severity": 5
+    },
+    {
+      "title": "Cross-origin policy permits broad subdomain patterns",
+      "description": "The CORS policy may trust a broad or attacker-controllable subdomain pattern.",
+      "curl": "curl -i --max-time 10 -H 'Origin: https://scanner.invalid.example.com' '{{baseUrl}}/'",
+      "regex": "(?im)^access-control-allow-origin:\\s*https://scanner\\.invalid\\.example\\.com\\s*$",
+      "severity": 6
+    },
+    {
+      "title": "Untrusted origin accepted by CORS suffix matching",
+      "description": "Origin matching may use unsafe suffix logic that accepts domains controlled by unrelated parties.",
+      "curl": "curl -i --max-time 10 -H 'Origin: https://example.com.scanner.invalid' '{{baseUrl}}/'",
+      "regex": "(?im)^access-control-allow-origin:\\s*https://example\\.com\\.scanner\\.invalid\\s*$",
+      "severity": 7
+    },
+    {
+      "title": "Authentication challenge configuration is inconsistent",
+      "description": "A protected route may return an error without an expected authentication challenge, suggesting inconsistent edge and application policy.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_known_protected_route__'",
+      "regex": "(?m)^HTTP/\\S+\\s+401\\b(?![\\s\\S]*^www-authenticate:)",
+      "severity": 2
+    },
+    {
+      "title": "Cross-origin policy allows credentials with wildcard-like reflection",
+      "description": "The service may reflect arbitrary origins while also enabling credentials, a high-risk combination for browser clients.",
+      "curl": "curl -i --max-time 10 -H 'Origin: https://scanner.invalid' '{{baseUrl}}/'",
+      "regex": "(?is)^HTTP/[^\\r\\n]+\\r?\\n(?:(?!\\r?\\n).)*(?:access-control-allow-origin:\\s*https://scanner\\.invalid\\s*\\r?\\n)(?:(?!\\r?\\n).)*access-control-allow-credentials:\\s*true",
+      "severity": 8
+    },
+    {
+      "title": "TLS-only service redirects to a noncanonical or untrusted host",
+      "description": "The HTTPS endpoint may use caller-controlled host information to construct redirects.",
+      "curl": "curl -i --max-time 10 -H 'Host: scanner.invalid' '{{baseUrl}}/__replace_with_safe_route__'",
+      "regex": "(?im)^location:\\s*https?://scanner\\.invalid(?:/|\\s|$)",
+      "severity": 6
+    },
+    {
+      "title": "Response includes internal environment name",
+      "description": "Responses may disclose environment labels such as staging, development, or internal production identifiers.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_safe_route__'",
+      "regex": "(?i)(environment\\s*[:=]\\s*(development|dev|staging|test|internal)|\\b(staging|development)\\.api\\.)",
+      "severity": 3
+    },
+    {
+      "title": "Public endpoint exposes framework actuator configuration",
+      "description": "Framework management endpoints may expose environment, configuration, or process information.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/actuator'",
+      "regex": "(?i)(\"_links\"\\s*:|\"env\"\\s*:|\"configprops\"\\s*:|\"beans\"\\s*:|\"mappings\"\\s*:)",
+      "severity": 8
+    },
+    {
+      "title": "Public endpoint exposes application environment variables",
+      "description": "A management endpoint may expose environment variables that include secrets or infrastructure details.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/actuator/env'",
+      "regex": "(?i)(\"propertySources\"\\s*:|\"activeProfiles\"\\s*:|\"systemEnvironment\"\\s*:|\"spring\\.datasource\")",
+      "severity": 9
+    },
+    {
+      "title": "Public endpoint exposes heap dump or process data",
+      "description": "A publicly reachable diagnostic endpoint may expose memory or process data containing sensitive values.",
+      "curl": "curl -I --max-time 10 '{{baseUrl}}/actuator/heapdump'",
+      "regex": "(?im)^content-type:\\s*application/octet-stream",
+      "severity": 9
+    },
+    {
+      "title": "Public endpoint exposes application mappings",
+      "description": "A management endpoint may reveal internal route mappings and service structure.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/actuator/mappings'",
+      "regex": "(?i)(\"dispatcherServlets\"\\s*:|\"handler\"\\s*:|\"predicate\"\\s*:)",
+      "severity": 5
+    },
+    {
+      "title": "Public endpoint exposes runtime metrics",
+      "description": "Metrics may disclose process, infrastructure, or workload information useful for reconnaissance.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/actuator/metrics'",
+      "regex": "(?i)(jvm\\.memory|process\\.cpu|http\\.server\\.requests|system\\.load)",
+      "severity": 4
+    },
+    {
+      "title": "Default framework landing page exposed",
+      "description": "A default server or framework welcome page may reveal deployment details or indicate incomplete hardening.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)(welcome to nginx|apache2 default page|it works!|spring boot|tomcat default)",
+      "severity": 2
+    },
+    {
+      "title": "Unprotected API schema endpoint",
+      "description": "A schema endpoint may be accessible without credentials, revealing routes and data models.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/openapi.json'",
+      "regex": "(?i)(\"openapi\"\\s*:|\"swagger\"\\s*:|\"paths\"\\s*:)",
+      "severity": 3
+    },
+    {
+      "title": "Unprotected API documentation UI",
+      "description": "An interactive documentation UI may be available without authentication.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/docs'",
+      "regex": "(?i)(swagger-ui|redoc|rapidoc|api documentation)",
+      "severity": 3
+    },
+    {
+      "title": "Debug endpoint reveals configuration values",
+      "description": "A debug or configuration route may return active settings, feature flags, or environment data.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_known_debug_route__'",
+      "regex": "(?i)(feature[_ -]?flags|config(uration)?\\s*[:=]|environment\\s*[:=]|secret\\s*[:=])",
+      "severity": 8
+    },
+    {
+      "title": "HTTP response allows caching of authorization errors",
+      "description": "Authentication or authorization error responses may be cached and affect later clients if cache directives are unsafe.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/__replace_with_known_protected_route__'",
+      "regex": "(?im)^HTTP/\\S+\\s+(401|403)\\b[\\s\\S]*?^cache-control:\\s*(?![^\\r\\n]*(no-store|private))",
+      "severity": 3
+    },
+    {
+      "title": "API response sets a cookie without an explicit expiration policy",
+      "description": "A session cookie may persist longer than intended if no Max-Age or Expires attribute is set.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/__replace_with_login_or_session_route__'",
+      "regex": "(?im)^set-cookie:(?![^\\r\\n]*;\\s*(max-age|expires)=)[^\\r\\n]+",
+      "severity": 3
+    },
+    {
+      "title": "Cookie uses insecure SameSite=None configuration",
+      "description": "A cookie marked SameSite=None must also be Secure; otherwise browser behavior may be inconsistent and cross-site exposure may increase.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/__replace_with_login_or_session_route__'",
+      "regex": "(?im)^set-cookie:(?=[^\\r\\n]*;\\s*samesite=none)(?![^\\r\\n]*;\\s*secure(?:;|\\s|$))[^\\r\\n]+",
+      "severity": 5
+    },
+    {
+      "title": "Security header is duplicated with conflicting values",
+      "description": "Duplicate security headers may be interpreted inconsistently by clients and intermediaries.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)(^x-content-type-options:.*\\r?\\n.*^x-content-type-options:|^strict-transport-security:.*\\r?\\n.*^strict-transport-security:)",
+      "severity": 3
+    },
+    {
+      "title": "Response includes permissive cross-origin embedder policy",
+      "description": "Cross-Origin-Embedder-Policy may be absent or permissive on browser applications that require cross-origin isolation.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^cross-origin-embedder-policy:\\s*unsafe-none",
+      "severity": 2
+    },
+    {
+      "title": "Untrusted request headers appear in redirect response",
+      "description": "The API may use caller-supplied forwarding headers when generating redirects.",
+      "curl": "curl -i --max-time 10 -H 'X-Forwarded-Host: scanner.invalid' -H 'X-Forwarded-Proto: https' '{{baseUrl}}/__replace_with_safe_redirect_route__'",
+      "regex": "(?im)^location:\\s*https?://scanner\\.invalid",
+      "severity": 6
+    },
+    {
+      "title": "HTTP response exposes server timing details",
+      "description": "Server-Timing may disclose internal component names or precise processing details.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^server-timing:\\s*[^\\r\\n]*(db|cache|app|origin|internal)",
+      "severity": 2
+    },
+    {
+      "title": "HTTP response exposes detailed cache diagnostics",
+      "description": "Cache diagnostic headers may disclose internal cache topology or backend identifiers.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^(x-cache|x-cache-hits|x-served-by|x-proxy-cache):\\s*[^\\r\\n]+",
+      "severity": 1
+    },
+    {
+      "title": "API accepts unexpected query parameter for format override",
+      "description": "A format override parameter may switch response handling or content type unexpectedly.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_read_only_route__?format=xml'",
+      "regex": "(?im)^content-type:\\s*application/xml",
+      "severity": 3
+    },
+    {
+      "title": "API accepts unexpected callback parameter",
+      "description": "A legacy callback parameter may change JSON responses into executable JavaScript.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_read_only_route__?callback=scannerProbe'",
+      "regex": "(?is)scannerProbe\\s*\\(",
+      "severity": 5
+    },
+    {
+      "title": "Production response includes test or sample data",
+      "description": "Responses may contain sample records, demo markers, or test identifiers indicating test data is deployed.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_authorized_read_only_route__'",
+      "regex": "(?i)(lorem ipsum|sample data|test account|dummy record|[\\w.+-]+@example\\.com|changeme)",
+      "severity": 3
+    },
+    {
+      "title": "Configuration backup suffix may be publicly served",
+      "description": "A known configuration file may have a publicly accessible editor or backup suffix. Check only paths confirmed to be in scope.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_known_config_path__.bak'",
+      "regex": "(?i)(password\\s*[:=]|secret\\s*[:=]|api[_-]?key\\s*[:=]|database_url)",
+      "severity": 8
+    },
+    {
+      "title": "Log endpoint or log artifact may be publicly served",
+      "description": "A known log route or artifact may disclose operational details, tokens, or personal information.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_known_log_path__'",
+      "regex": "(?i)(authorization:\\s*bearer|access_token|client_secret|password\\s*[:=])",
+      "severity": 8
+    },
+    {
+      "title": "Open redirect may be configured on logout or login route",
+      "description": "A return or redirect parameter may allow navigation to an arbitrary external site.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_known_login_or_logout_route__?returnUrl=https%3A%2F%2Fscanner.invalid'",
+      "regex": "(?im)^location:\\s*https?://scanner\\.invalid(?:/|\\s|$)",
+      "severity": 5
+    },
+    {
+      "title": "HTTP compression is enabled on sensitive authenticated responses",
+      "description": "Compression on responses that mix secrets and attacker-controlled content may create side-channel risk in some contexts.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 -H 'Accept-Encoding: gzip, br' -H 'Authorization: Bearer __approved_test_token__' '{{baseUrl}}/__replace_with_authorized_route__'",
+      "regex": "(?im)^content-encoding:\\s*(gzip|br|deflate)\\s*$",
+      "severity": 3
+    },
+    {
+      "title": "HTTP request body accepted without declared content length or framing policy",
+      "description": "Inconsistent request framing across proxies and backends may indicate request smuggling risk. Requires specialized testing and configuration review.",
+      "curl": "curl -i --max-time 10 -X POST -H 'Transfer-Encoding: chunked' -H 'Content-Type: application/json' --data-binary '0' '{{baseUrl}}/__replace_with_staging_test_route__'",
+      "regex": "(?im)^HTTP/\\S+\\s+2\\d\\d\\b",
+      "severity": 7
+    },
+    {
+      "title": "HTTP response includes permissive cross-origin policy for HTML",
+      "description": "Browser-rendered HTML may be accessible to unrelated origins due to permissive CORS configuration.",
+      "curl": "curl -i --max-time 10 -H 'Origin: https://scanner.invalid' '{{baseUrl}}/__replace_with_html_response_route__'",
+      "regex": "(?im)^access-control-allow-origin:\\s*\\*\\s*$",
+      "severity": 4
+    },
+    {
+      "title": "Insecure redirect from API root",
+      "description": "The API root may redirect users or clients to an unencrypted HTTP URL.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^location:\\s*http://",
+      "severity": 6
+    },
+    {
+      "title": "Production API serves an unexpected plaintext response",
+      "description": "A response may contain credentials or sensitive data over HTTP instead of redirecting or refusing the connection.",
+      "curl": "curl -i --max-time 10 '{{httpBaseUrl}}/__replace_with_authorized_non_mutating_route__'",
+      "regex": "(?im)^HTTP/\\S+\\s+2\\d\\d\\b",
+      "severity": 8
+    },
+    {
+      "title": "Certificate hostname does not match API host",
+      "description": "The TLS certificate may not cover the requested API hostname.",
+      "curl": "curl -Iv --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)(no alternative certificate subject name matches|subject name .* does not match|certificate subject name .* does not match)",
+      "severity": 8
+    },
+    {
+      "title": "Certificate chain is incomplete or untrusted",
+      "description": "The server may not provide a complete trusted certificate chain.",
+      "curl": "curl -Iv --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)(unable to get local issuer certificate|unable to verify the first certificate|self-signed certificate)",
+      "severity": 7
+    },
+    {
+      "title": "API response leaks cloud metadata or instance identity",
+      "description": "A response may expose cloud instance identifiers, role names, or metadata-derived values.",
+      "curl": "curl -sS --max-time 10 '{{baseUrl}}/__replace_with_authorized_read_only_route__'",
+      "regex": "(?i)(instance-id|iam/security-credentials|computeMetadata|169\\.254\\.169\\.254|arn:aws:iam::)",
+      "severity": 8
+    },
+    {
+      "title": "API response exposes internal service URLs",
+      "description": "Responses may reveal internal HTTP service URLs or private hostnames.",
+      "curl": "curl -sS --max-time 10 '{{baseUrl}}/__replace_with_authorized_read_only_route__'",
+      "regex": "(?i)https?://(?:localhost|127\\.0\\.0\\.1|10(?:\\.\\d{1,3}){3}|192\\.168(?:\\.\\d{1,3}){2}|[a-z0-9-]+\\.internal)(?::\\d+)?",
+      "severity": 5
+    },
+    {
+      "title": "API response exposes filesystem or source repository metadata",
+      "description": "Responses may disclose source paths, repository locations, or build workspace details.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_known_invalid_route__'",
+      "regex": "(?i)(/workspace/|/build/|/var/lib/|\\.git/|github\\.com/[\\w-]+/[\\w.-]+)",
+      "severity": 3
+    },
+    {
+      "title": "Production debug mode or verbose error leakage",
+      "description": "The API may expose stack traces, internal paths, environment details, or interactive debug tools.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_a_known_invalid_route__'",
+      "regex": "(?i)(traceback|stack trace|exception at|debug toolbar|werkzeug debugger|development mode|\\.java:\\d+| at [\\w.$]+\\([^)]*:\\d+\\))",
+      "severity": 8
+    },
+    {
+      "title": "CORS allows any origin",
+      "description": "The API may allow browser-based requests from any origin. Risk increases when credentials or sensitive data are involved.",
+      "curl": "curl -i --max-time 10 -H 'Origin: https://scanner.invalid' '{{baseUrl}}/'",
+      "regex": "(?im)^access-control-allow-origin:\\s*\\*\\s*$",
+      "severity": 5
+    },
+    {
+      "title": "CORS reflects an arbitrary origin",
+      "description": "The API may copy a caller-supplied Origin into its CORS response, potentially allowing untrusted websites to read responses in a browser.",
+      "curl": "curl -i --max-time 10 -H 'Origin: https://scanner.invalid' '{{baseUrl}}/'",
+      "regex": "(?im)^access-control-allow-origin:\\s*https://scanner\\.invalid\\s*$",
+      "severity": 7
+    },
+    {
+      "title": "Credentialed CORS enabled",
+      "description": "The API may allow browsers to include credentials in cross-origin requests. Combined with an overly broad origin policy, this can expose authenticated data.",
+      "curl": "curl -i --max-time 10 -H 'Origin: https://scanner.invalid' '{{baseUrl}}/'",
+      "regex": "(?im)^access-control-allow-credentials:\\s*true\\s*$",
+      "severity": 6
+    },
+    {
+      "title": "HTTP endpoint does not redirect to HTTPS",
+      "description": "The API may accept cleartext HTTP connections, which can expose requests or credentials in transit.",
+      "curl": "curl -i --max-time 10 '{{httpBaseUrl}}/'",
+      "regex": "(?is)^HTTP/\\S+\\s+(?!301|302|307|308)\\d{3}|^HTTP/\\S+\\s+(?:301|302|307|308)[\\s\\S]*?^Location:\\s*http://",
+      "severity": 8
+    },
+    {
+      "title": "Security headers missing or weakened",
+      "description": "Browser-facing API responses may lack transport or content-type protections. Applicability depends on whether browsers consume the API.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)^(?![\\s\\S]*\\r?\\nstrict-transport-security:)(?![\\s\\S]*\\r?\\nx-content-type-options:)",
+      "severity": 3
+    },
+    {
+      "title": "API documentation route publicly reachable",
+      "description": "OpenAPI/Swagger documentation or an interactive API console may reveal routes or enable calls. Exposure is not automatically a vulnerability if access controls are sound.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/swagger'",
+      "regex": "(?i)(swagger ui|swagger-ui|redoc|\"openapi\"\\s*:|\"swagger\"\\s*:|graphiql|graphql playground)",
+      "severity": 3
+    },
+    {
+      "title": "Metrics endpoint reveals operational details",
+      "description": "Health, metrics, or status endpoints may expose internal service names, versions, hostnames, or environment information.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/metrics'",
+      "regex": "(?i)(prometheus|process_start_time_seconds|jvm_|hostname|internal[_ -]?service|database[_ -]?host|environment\\s*[:=])",
+      "severity": 5
+    },
+    {
+      "title": "Server or framework version disclosed",
+      "description": "Response headers may disclose server or framework versions that help identify outdated components.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?im)^(server|x-powered-by|x-aspnet-version):\\s*[^\\r\\n]+",
+      "severity": 2
+    },
+    {
+      "title": "Authentication may be missing on a protected route",
+      "description": "A route expected to require authentication may return a successful response without credentials. Route intent must be established from an API specification or policy.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_a_known_protected_route__'",
+      "regex": "(?m)^HTTP/\\S+\\s+2\\d\\d\\b",
+      "severity": 9
+    },
+    {
+      "title": "Rate limiting may be absent",
+      "description": "Repeated requests may not receive throttling or quota signals. This is most concerning on login, recovery, OTP, payment, or expensive operations.",
+      "curl": "for i in 1 2 3 4 5; do curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/__replace_with_authorized_low_impact_route__'; done",
+      "regex": "(?im)^(x-ratelimit-limit|ratelimit-limit|retry-after):",
+      "severity": 5
+    },
+    {
+      "title": "Oversized request limits may be missing",
+      "description": "Request bodies may be accepted without suitable size limits, creating denial-of-service or storage risks. Use a staging environment for size-limit testing.",
+      "curl": "curl -i --max-time 10 -X POST -H 'Content-Type: application/json' --data '{\"scanner_probe\":\"small_safe_test\"}' '{{baseUrl}}/__replace_with_authorized_test_endpoint__'",
+      "regex": "(?i)(413\\s+Payload Too Large|request entity too large|content too large)",
+      "severity": 5
+    },
+    {
+      "title": "Default or test credentials may be enabled",
+      "description": "Approved sample credentials or test accounts may remain active in production and provide unauthorized access.",
+      "curl": "curl -i --max-time 10 -X POST '{{baseUrl}}/__replace_with_documented_login_route__' -H 'Content-Type: application/json' --data '{\"username\":\"__approved_test_account__\",\"password\":\"__approved_test_password__\"}'",
+      "regex": "(?i)(access_token|refresh_token|\"token\"\\s*:|\"authenticated\"\\s*:\\s*true)",
+      "severity": 8
+    },
+    {
+      "title": "Debug or test routes may be exposed",
+      "description": "Development, test, or administrative routes may be deployed publicly and disclose state or provide privileged operations.",
+      "curl": "curl -i --max-time 10 '{{baseUrl}}/__replace_with_a_known_candidate_route__'",
+      "regex": "(?i)(debug|internal|admin|test|actuator|env|config|heapdump|metrics)",
+      "severity": 7
+    },
+    {
+      "title": "Cache policy may allow sensitive responses to be stored",
+      "description": "Responses containing account or personal data may be cacheable by shared intermediaries if cache directives are missing or permissive.",
+      "curl": "curl -sS -D - -o /dev/null --max-time 10 '{{baseUrl}}/__replace_with_authorized_sensitive_read_route__'",
+      "regex": "(?im)^cache-control:\\s*(?![^\\r\\n]*(no-store|private))[^\\r\\n]*",
+      "severity": 5
+    },
+    {
+      "title": "TLS protocol configuration may be weak",
+      "description": "The service may support obsolete TLS protocol versions or weak ciphers. HTTP response checks alone cannot reliably establish TLS configuration.",
+      "curl": "curl -Iv --max-time 10 '{{baseUrl}}/'",
+      "regex": "(?i)(SSL connection using TLSv1(?:\\.0|\\.1)?|SSL connection using TLSv1\\.0|SSL connection using TLSv1\\.1)",
+      "severity": 7
+    },
+    {
+      "title": "Production secrets may be exposed in API responses",
+      "description": "Responses may contain credentials, tokens, private keys, or cloud secrets due to configuration or data-handling mistakes.",
+      "curl": "curl -sS --max-time 10 '{{baseUrl}}/__replace_with_authorized_read_only_route__'",
+      "regex": "(?i)(-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|\\b(api[_-]?key|client[_-]?secret|access[_-]?token|password)\\b\\s*[:=]\\s*['\\\"]?[^\\s'\\\",}]+)",
+      "severity": 9
+    }
+  ]
+}

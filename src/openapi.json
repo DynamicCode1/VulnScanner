@@ -1,0 +1,157 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SentinelAPI Demo Target",
+    "version": "1.4.2",
+    "description": "The intentionally vulnerable API defined in src/server.ts. Scanned by src/scan.ts."
+  },
+  "servers": [
+    { "url": "http://127.0.0.1:5001", "description": "Local demo target" }
+  ],
+  "tags": [
+    { "name": "meta", "description": "Service metadata and diagnostics" },
+    { "name": "users", "description": "Account data" },
+    { "name": "orders", "description": "Order data" }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getServiceBanner",
+        "summary": "Service banner",
+        "responses": { "200": { "description": "Service name and links" } }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getHealth",
+        "summary": "Health check with dependency detail",
+        "responses": { "200": { "description": "Database, cache and queue status" } }
+      }
+    },
+    "/version": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getVersion",
+        "summary": "Build and version metadata",
+        "responses": { "200": { "description": "Version, commit, build id, git sha" } }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getMetrics",
+        "summary": "Prometheus metrics",
+        "responses": { "200": { "description": "Metrics in text exposition format" } }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getOpenApiDocument",
+        "summary": "This document",
+        "responses": { "200": { "description": "The OpenAPI description" } }
+      }
+    },
+    "/docs": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getDocs",
+        "summary": "Swagger UI",
+        "responses": { "200": { "description": "HTML documentation page" } }
+      }
+    },
+    "/api/users/{id}": {
+      "get": {
+        "tags": ["users"],
+        "operationId": "getUser",
+        "summary": "Read a user profile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "example": "101" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "The user record" },
+          "404": { "description": "Unknown user" }
+        }
+      }
+    },
+    "/api/orders/{id}": {
+      "get": {
+        "tags": ["orders"],
+        "operationId": "getOrder",
+        "summary": "Read an order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "example": "1" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "The order record" },
+          "404": { "description": "Unknown order" }
+        }
+      }
+    },
+    "/api/admin/config": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getAdminConfig",
+        "summary": "Privileged configuration",
+        "responses": { "200": { "description": "Runtime configuration" } }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "tags": ["users"],
+        "operationId": "search",
+        "summary": "Search records",
+        "parameters": [
+          { "name": "q", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "page_size", "in": "query", "required": false, "schema": { "type": "integer", "default": 10 } }
+        ],
+        "responses": { "200": { "description": "Matching records" } }
+      }
+    },
+    "/api/debug/error": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getDebugError",
+        "summary": "Diagnostic failure route",
+        "responses": { "500": { "description": "Verbose error detail" } }
+      }
+    },
+    "/api/login": {
+      "post": {
+        "tags": ["meta"],
+        "operationId": "login",
+        "summary": "Authenticate and receive a session cookie",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string" },
+                  "password": { "type": "string", "format": "password" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Authenticated" },
+          "401": { "description": "Bad credentials" }
+        }
+      }
+    }
+  }
+}

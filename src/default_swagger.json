@@ -1,0 +1,96 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Default API Surface",
+    "version": "1.0.0",
+    "description": "Fallback surface used when the caller supplies only a URL and no spec. It describes the conventional endpoints a JSON API tends to expose: the well-known diagnostic routes plus a generic REST resource pair. The server url below is a placeholder and is always overridden by the URL that was passed on the command line."
+  },
+  "x-sentinel-note": "default_swagger.json — injected automatically whenever scan.ts receives an origin instead of a spec.",
+  "servers": [
+    { "url": "http://localhost:3000", "description": "Placeholder — overridden by the CLI origin" }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "getRoot",
+        "summary": "Service root or banner",
+        "responses": { "200": { "description": "Service banner" } }
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Health check",
+        "responses": { "200": { "description": "Liveness and dependency detail" } }
+      }
+    },
+    "/version": {
+      "get": {
+        "operationId": "getVersion",
+        "summary": "Version and build metadata",
+        "responses": { "200": { "description": "Version information" } }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "getMetrics",
+        "summary": "Runtime metrics",
+        "responses": { "200": { "description": "Metrics in text exposition format" } }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "operationId": "getSchema",
+        "summary": "API description",
+        "responses": { "200": { "description": "OpenAPI document" } }
+      }
+    },
+    "/docs": {
+      "get": {
+        "operationId": "getDocs",
+        "summary": "Interactive API documentation",
+        "responses": { "200": { "description": "Documentation UI" } }
+      }
+    },
+    "/graphql": {
+      "post": {
+        "operationId": "graphql",
+        "summary": "GraphQL endpoint",
+        "responses": { "200": { "description": "GraphQL result" } }
+      }
+    },
+    "/actuator": {
+      "get": {
+        "operationId": "getActuator",
+        "summary": "Framework management root",
+        "responses": { "200": { "description": "Management links" } }
+      }
+    },
+    "/api/users/{id}": {
+      "get": {
+        "operationId": "getUser",
+        "summary": "Read a user",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "example": "1" } }
+        ],
+        "responses": {
+          "200": { "description": "User record" },
+          "404": { "description": "Unknown user" }
+        }
+      }
+    },
+    "/api/orders/{id}": {
+      "get": {
+        "operationId": "getOrder",
+        "summary": "Read an order",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "example": "1" } }
+        ],
+        "responses": {
+          "200": { "description": "Order record" },
+          "404": { "description": "Unknown order" }
+        }
+      }
+    }
+  }
+}
