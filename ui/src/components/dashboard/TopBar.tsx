@@ -1,8 +1,9 @@
-import { ExternalLink, ListChecks, Loader2, Play, RotateCcw, ShieldCheck, Sparkles } from 'lucide-react'
+import { ExternalLink, ListChecks, Loader2, Moon, Play, RotateCcw, ShieldCheck, Sparkles, Sun } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useTheme } from '@/hooks/useTheme'
 import { cn } from '@/lib/utils'
 
 export type TabKey = 'checks' | 'report'
@@ -30,8 +31,10 @@ export function TopBar({
   surfaceLabel,
   reportReady,
 }: TopBarProps) {
+  const { theme, toggle } = useTheme()
+
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-white/[0.07] bg-card/60 px-3 backdrop-blur">
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-hairline bg-card/60 px-3 backdrop-blur">
       <div className="flex shrink-0 items-center gap-2 pl-1 pr-2">
         <div className="flex size-7 items-center justify-center rounded-lg bg-brand/15 ring-1 ring-brand/30">
           <ShieldCheck className="size-4 text-brand" />
@@ -77,6 +80,17 @@ export function TopBar({
 
       <Button variant="ghost" size="icon" className="size-9 shrink-0" onClick={onReset} title="Start over">
         <RotateCcw className="size-4" />
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-9 shrink-0"
+        onClick={toggle}
+        aria-label="Toggle colour theme"
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
       </Button>
 
       <a

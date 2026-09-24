@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { fetchHistory } from '@/lib/api'
+import { clearHistory, fetchHistory } from '@/lib/api'
 import type { HistoryEntry } from '@/lib/types'
 
 /**
@@ -24,9 +24,24 @@ export function useHistory(active: boolean) {
     }
   }, [])
 
-  useEffect(() => {
-    void refresh()
+  /** Wipes the log on the server, then reloads the (now empty) list. */
+  const reset = useCallback(async () => {
+    try {
+      await clearHistory()
+    } catch {
+      // If the clear fails the refresh below still shows whatever is there.
+    }
+    setSelected(null)
+    setEntries([])
+    await refresh()
   }, [refresh])
+
+  // A dashboard session starts empty. The file is a real audit trail on the server, but
+  // carrying a previous session's probes into a fresh one is just noise — and it made the
+  // history look persistent across refreshes.
+  useEffect(() => {
+    void reset()
+  }, [reset])
 
   useEffect(() => {
     if (!active) return
@@ -36,5 +51,5 @@ export function useHistory(active: boolean) {
 
   const selectedEntry = entries.find((entry) => entry.id === selected) ?? null
 
-  return { entries, selected, selectedEntry, setSelected, refresh }
+  return { entries, selected, selectedEntry, setSelected, refresh, reset }
 }

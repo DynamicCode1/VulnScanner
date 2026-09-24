@@ -1,0 +1,385 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SentinelAPI Demo Target",
+    "version": "1.4.2",
+    "description": "Deliberately vulnerable API defined in src/server.ts. Point the scanner at this file to exercise the spec-injection path: every documented operation below becomes an entry in the site map, and path parameters are filled from their examples.",
+    "contact": { "name": "Team 0dayTM" },
+    "license": { "name": "MIT" }
+  },
+  "servers": [
+    { "url": "http://127.0.0.1:5001", "description": "Local demo target" }
+  ],
+  "tags": [
+    { "name": "meta", "description": "Service metadata and diagnostics" },
+    { "name": "users", "description": "Account data" },
+    { "name": "orders", "description": "Order data" },
+    { "name": "auth", "description": "Authentication" }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getServiceBanner",
+        "summary": "Service banner",
+        "description": "Service name, environment and links. Returns a weak session cookie and no security headers.",
+        "responses": {
+          "200": {
+            "description": "Banner",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Banner" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getHealth",
+        "summary": "Health check with dependency detail",
+        "description": "Reports database, cache and queue status to anonymous callers, including internal hostnames.",
+        "responses": {
+          "200": {
+            "description": "Dependency status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Health" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/version": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getVersion",
+        "summary": "Build and version metadata",
+        "description": "Version, environment, commit, build id and git sha.",
+        "responses": {
+          "200": {
+            "description": "Build metadata",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Version" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getMetrics",
+        "summary": "Prometheus metrics",
+        "description": "Process and host metrics in text exposition format, naming internal services.",
+        "responses": {
+          "200": {
+            "description": "Metrics text",
+            "content": { "text/plain": { "schema": { "type": "string" } } }
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getOpenApiDocument",
+        "summary": "This document",
+        "description": "The OpenAPI description, served without authentication.",
+        "responses": { "200": { "description": "The OpenAPI description" } }
+      }
+    },
+    "/docs": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getDocs",
+        "summary": "Swagger UI",
+        "description": "Interactive HTML console, served without authentication.",
+        "responses": {
+          "200": {
+            "description": "Documentation page",
+            "content": { "text/html": { "schema": { "type": "string" } } }
+          }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "get": {
+        "tags": ["users"],
+        "operationId": "getUser",
+        "summary": "Read a user profile",
+        "description": "Returns the full account record, including password_hash, ssn, api_key and internal_notes.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "User id",
+            "schema": { "type": "string", "example": "101" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The user record",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown user",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders/{id}": {
+      "get": {
+        "tags": ["orders"],
+        "operationId": "getOrder",
+        "summary": "Read an order",
+        "description": "Returns any order by id with no ownership check.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Order id",
+            "schema": { "type": "string", "example": "1" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The order record",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Order" }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown order",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/config": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getAdminConfig",
+        "summary": "Privileged configuration",
+        "description": "Runtime configuration including the signing key. Documented as privileged, but served without authentication.",
+        "responses": {
+          "200": {
+            "description": "Runtime configuration",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AdminConfig" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "tags": ["users"],
+        "operationId": "search",
+        "summary": "Search records",
+        "description": "Ignores the query and returns every matching record; page_size is not bounded.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Search term",
+            "schema": { "type": "string", "example": "asha" }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "description": "Maximum records to return",
+            "schema": { "type": "integer", "default": 10, "example": 2 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching records",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SearchResult" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/debug/error": {
+      "get": {
+        "tags": ["meta"],
+        "operationId": "getDebugError",
+        "summary": "Diagnostic failure route",
+        "description": "Always fails with a verbose body: SQL fragment, stack frame and absolute filesystem path.",
+        "responses": {
+          "500": {
+            "description": "Verbose failure detail",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DebugError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/login": {
+      "post": {
+        "tags": ["auth"],
+        "operationId": "login",
+        "summary": "Authenticate",
+        "description": "Accepts any credentials, including an empty body, and returns a static access token. No rate limiting.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LoginResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Bad credentials",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Banner": {
+        "type": "object",
+        "properties": {
+          "service": { "type": "string", "example": "SentinelAPI Demo" },
+          "message": { "type": "string" },
+          "documentation": { "type": "string", "example": "/docs" },
+          "spec": { "type": "string", "example": "/openapi.json" }
+        }
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "example": "ok" },
+          "environment": { "type": "string", "example": "staging" },
+          "database": { "type": "object", "description": "Driver, host and latency" },
+          "cache": { "type": "object", "description": "Driver and host" },
+          "queue": { "type": "object", "description": "Driver and status" },
+          "uptime_seconds": { "type": "integer" }
+        }
+      },
+      "Version": {
+        "type": "object",
+        "properties": {
+          "service": { "type": "string" },
+          "version": { "type": "string", "example": "1.4.2" },
+          "environment": { "type": "string" },
+          "commit": { "type": "string" },
+          "build_id": { "type": "string" },
+          "git_sha": { "type": "string" },
+          "built_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "101" },
+          "name": { "type": "string", "example": "Asha Verma" },
+          "email": { "type": "string", "format": "email" },
+          "role": { "type": "string", "example": "user" },
+          "tenant": { "type": "string", "example": "north" },
+          "api_key": { "type": "string", "description": "Exposed account API key" },
+          "password_hash": { "type": "string", "description": "Exposed bcrypt hash" },
+          "ssn": { "type": "string", "description": "Exposed national identifier" },
+          "internal_notes": { "type": "string" }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "1" },
+          "owner": { "type": "string", "example": "asha" },
+          "total": { "type": "number", "example": 4200 },
+          "card_last4": { "type": "string", "example": "4242" }
+        }
+      },
+      "AdminConfig": {
+        "type": "object",
+        "properties": {
+          "environment": { "type": "string" },
+          "auth_required": { "type": "boolean", "example": false },
+          "signing_key": { "type": "string", "description": "Exposed signing key" },
+          "internal_service": { "type": "string" },
+          "debug": { "type": "boolean" }
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" },
+          "page_size": { "type": "integer" },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/User" } }
+        }
+      },
+      "DebugError": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string", "example": "QueryFailedError" },
+          "message": { "type": "string", "example": "SQL syntax error near 'SELECT * FROM users'" },
+          "stack": { "type": "string" },
+          "path": { "type": "string", "example": "/srv/app/src/db/query-runner.ts" }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "username": { "type": "string", "example": "asha" },
+          "password": { "type": "string", "format": "password" }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "authenticated": { "type": "boolean", "example": true },
+          "access_token": { "type": "string", "description": "Static, identical for every caller" },
+          "expires_in": { "type": "integer", "example": 3600 }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": { "error": { "type": "string" } }
+      }
+    }
+  }
+}

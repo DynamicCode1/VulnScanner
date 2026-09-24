@@ -1,7 +1,14 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { streamSse } from '@/lib/api'
 import type { CheckMeta, CheckOutcome, CheckState } from '@/lib/types'
+
+/**
+ * A real scan of a local target finishes in ~40ms — correct, but it reads as nothing
+ * having happened. Rows are revealed one per tick instead, so the run looks like work
+ * being done without slowing the scanner itself.
+ */
+const REVEAL_MS = 65
 
 type ScanEvent =
   | { type: 'start'; total: number; checks: CheckMeta[] }
@@ -32,44 +39,45 @@ export interface ScanSummary {
 }
 
 export function useScan() {
-  const [checks, setChecks] = useState<CheckState[]>([])
-  const [running, setRunning] = useState(false)
+  const [metas, setMetas] = useState<CheckMeta[]>([])
+  const [results, setResults] = useState<Record<number, CheckOutcome>>({})
+  const [revealed, setRevealed] = useState(0)
+  const [scanning, setScanning] = useState(false)
   const [summary, setSummary] = useState<ScanSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const completed = useRef(0)
+  /** Which target the last run was against, so callers can tell whether results are current. */
+  const [scannedTarget, setScannedTarget] = useState<string | null>(null)
+
+  /** Indices the backend has actually answered — a row must not be revealed before this. */
+  const received = useRef<Set<number>>(new Set())
+  const streamDone = useRef(false)
+  const pendingSummary = useRef<ScanSummary | null>(null)
 
   const run = useCallback(async (target: string) => {
-    setRunning(true)
-    setSummary(null)
+    setScanning(true)
     setError(null)
-    setChecks([])
-    completed.current = 0
+    setSummary(null)
+    setMetas([])
+    setResults({})
+    setRevealed(0)
+    setScannedTarget(target.trim())
+    received.current = new Set()
+    streamDone.current = false
+    pendingSummary.current = null
 
     try {
       await streamSse<ScanEvent>('/api/scan', { target }, (event) => {
         switch (event.type) {
           case 'start':
-            setChecks(event.checks.map((meta) => ({ meta, status: 'queued' as const })))
-            break
-          case 'running':
-            setChecks((previous) =>
-              previous.map((entry) =>
-                entry.meta.index === event.index ? { ...entry, status: 'running' as const } : entry,
-              ),
-            )
+            setMetas(event.checks)
             break
           case 'result':
-            completed.current += 1
-            setChecks((previous) =>
-              previous.map((entry) =>
-                entry.meta.index === event.index
-                  ? { ...entry, status: 'done' as const, outcome: event.result }
-                  : entry,
-              ),
-            )
+            received.current.add(event.index)
+            setResults((previous) => ({ ...previous, [event.index]: event.result }))
             break
           case 'done':
-            setSummary({ ...event.summary, durationMs: event.durationMs })
+            pendingSummary.current = { ...event.summary, durationMs: event.durationMs }
+            streamDone.current = true
             break
           case 'error':
             setError(event.message)
@@ -79,9 +87,43 @@ export function useScan() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught))
     } finally {
-      setRunning(false)
+      setScanning(false)
+      streamDone.current = true
     }
   }, [])
 
-  return { checks, running, summary, error, run }
+  const sweepComplete = metas.length === 0 || revealed >= metas.length
+
+  // The reveal ticker. It advances one row per tick and stalls rather than lying: a row
+  // is only revealed once its probe has actually come back.
+  useEffect(() => {
+    if (sweepComplete) return
+
+    const timer = window.setInterval(() => {
+      setRevealed((count) => {
+        if (count >= metas.length) return count
+        if (!received.current.has(count) && !streamDone.current) return count
+        return count + 1
+      })
+    }, REVEAL_MS)
+
+    return () => window.clearInterval(timer)
+  }, [sweepComplete, metas.length])
+
+  // Hold the result chips back until the sweep finishes, so the summary never lands
+  // before the animation it describes.
+  useEffect(() => {
+    if (sweepComplete && pendingSummary.current) {
+      setSummary(pendingSummary.current)
+      pendingSummary.current = null
+    }
+  }, [sweepComplete])
+
+  const checks: CheckState[] = metas.map((meta, index) => ({
+    meta,
+    status: index < revealed ? 'done' : index === revealed ? 'running' : 'queued',
+    outcome: index < revealed ? results[index] : undefined,
+  }))
+
+  return { checks, running: scanning || !sweepComplete, summary, error, run, scannedTarget }
 }

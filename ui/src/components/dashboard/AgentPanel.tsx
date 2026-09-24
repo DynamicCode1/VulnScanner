@@ -17,9 +17,27 @@ interface AgentPanelProps {
   error: string | null
   onStart: () => void
   onSend: (message: string) => void
+  /** Overridable so the report can reuse this panel as a Q&A box over the same session. */
+  title?: string
+  startLabel?: string
+  startHint?: string
+  startHeadline?: string
+  placeholder?: string
 }
 
-export function AgentPanel({ messages, running, summary, error, onStart, onSend }: AgentPanelProps) {
+export function AgentPanel({
+  messages,
+  running,
+  summary,
+  error,
+  onStart,
+  onSend,
+  title = 'Agent',
+  startLabel = 'Run AI agent for vulnerability finding',
+  startHint = 'It probes the target, chains requests to confirm logic flaws, and records what it proves.',
+  startHeadline = 'Hand it to the agent',
+  placeholder = 'Ask about a finding, or tell it what to test next…',
+}: AgentPanelProps) {
   const [draft, setDraft] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const started = messages.length > 0
@@ -37,10 +55,10 @@ export function AgentPanel({ messages, running, summary, error, onStart, onSend 
 
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/[0.06] px-3 py-2">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-hairline px-3 py-2">
         <div className="flex items-center gap-2">
           <Bot className="size-3.5 text-brand" />
-          <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Agent</h2>
+          <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</h2>
           {running && <Loader2 className="size-3 animate-spin text-brand" />}
         </div>
 
@@ -57,7 +75,14 @@ export function AgentPanel({ messages, running, summary, error, onStart, onSend 
       </div>
 
       {!started ? (
-        <StartPrompt onStart={onStart} running={running} error={error} />
+        <StartPrompt
+          onStart={onStart}
+          running={running}
+          error={error}
+          label={startLabel}
+          hint={startHint}
+          headline={startHeadline}
+        />
       ) : (
         <>
           <ScrollArea className="min-h-0 flex-1">
@@ -84,7 +109,7 @@ export function AgentPanel({ messages, running, summary, error, onStart, onSend 
             </div>
           </ScrollArea>
 
-          <div className="shrink-0 border-t border-white/[0.06] p-2.5">
+          <div className="shrink-0 border-t border-hairline p-2.5">
             <div className="relative">
               <Textarea
                 value={draft}
@@ -96,7 +121,7 @@ export function AgentPanel({ messages, running, summary, error, onStart, onSend 
                   }
                 }}
                 rows={2}
-                placeholder="Ask about a finding, or tell it what to test next…"
+                placeholder={placeholder}
                 className="resize-none pr-10 text-xs"
               />
               <Button
@@ -119,7 +144,21 @@ export function AgentPanel({ messages, running, summary, error, onStart, onSend 
   )
 }
 
-function StartPrompt({ onStart, running, error }: { onStart: () => void; running: boolean; error: string | null }) {
+function StartPrompt({
+  onStart,
+  running,
+  error,
+  label,
+  hint,
+  headline,
+}: {
+  onStart: () => void
+  running: boolean
+  error: string | null
+  label: string
+  hint: string
+  headline: string
+}) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
       <motion.div
@@ -132,16 +171,14 @@ function StartPrompt({ onStart, running, error }: { onStart: () => void; running
       </motion.div>
 
       <div className="space-y-1">
-        <p className="text-sm font-medium">Hand it to the agent</p>
-        <p className="max-w-xs text-xs leading-relaxed text-muted-foreground">
-          It probes the target, chains requests to confirm logic flaws, and records what it proves.
-        </p>
+        <p className="text-sm font-medium">{headline}</p>
+        <p className="max-w-xs text-xs leading-relaxed text-muted-foreground">{hint}</p>
       </div>
 
       <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
         <Button onClick={onStart} disabled={running} className="gap-2">
           {running ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
-          {running ? 'Agent running…' : 'Run AI agent for vulnerability finding'}
+          {running ? 'Working…' : label}
         </Button>
       </motion.div>
 
@@ -150,13 +187,13 @@ function StartPrompt({ onStart, running, error }: { onStart: () => void; running
   )
 }
 
-function MessageRow({ message }: { message: ChatMessage }) {
+export function MessageRow({ message }: { message: ChatMessage }) {
   if (message.role === 'tool') {
     return (
       <motion.div
         initial={{ opacity: 0, x: -4 }}
         animate={{ opacity: 1, x: 0 }}
-        className="flex items-start gap-2 rounded-md border border-white/[0.05] bg-black/25 px-2.5 py-1.5"
+        className="flex items-start gap-2 rounded-md border border-hairline bg-inset px-2.5 py-1.5"
       >
         <SquareTerminal className="mt-0.5 size-3 shrink-0 text-brand/70" />
         <span className="min-w-0 flex-1 break-words font-mono text-[11px] leading-relaxed text-muted-foreground">
@@ -178,7 +215,7 @@ function MessageRow({ message }: { message: ChatMessage }) {
       <div
         className={cn(
           'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md ring-1',
-          isUser ? 'bg-white/[0.05] ring-white/10' : 'bg-brand/10 ring-brand/25',
+          isUser ? 'bg-panel-2 ring-hairline' : 'bg-brand/10 ring-brand/25',
         )}
       >
         {isUser ? <User className="size-3 text-muted-foreground" /> : <Bot className="size-3 text-brand" />}
@@ -187,7 +224,7 @@ function MessageRow({ message }: { message: ChatMessage }) {
       <div
         className={cn(
           'min-w-0 max-w-[88%] rounded-xl px-3 py-2 text-xs leading-relaxed',
-          isUser ? 'bg-white/[0.06] text-foreground' : 'bg-white/[0.02] ring-1 ring-white/[0.05]',
+          isUser ? 'bg-panel-3 text-foreground' : 'bg-panel ring-1 ring-hairline',
         )}
       >
         {isUser ? (

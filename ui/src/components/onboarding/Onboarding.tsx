@@ -16,7 +16,7 @@ interface OnboardingProps {
 type Mode = 'spec' | 'url'
 
 const panel =
-  'rounded-2xl border border-white/[0.07] bg-white/[0.02] p-6 shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset] backdrop-blur'
+  'rounded-2xl border border-hairline bg-panel p-6 backdrop-blur dark:shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset]'
 
 export function Onboarding({ onReady }: OnboardingProps) {
   const [mode, setMode] = useState<Mode | null>(null)
@@ -32,7 +32,7 @@ export function Onboarding({ onReady }: OnboardingProps) {
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
           className="mb-10 text-center"
         >
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-muted-foreground">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-hairline bg-panel px-3 py-1 text-xs text-muted-foreground">
             <ShieldCheck className="size-3.5 text-brand" />
             Zero-trust API vulnerability scanner
           </div>
@@ -62,7 +62,7 @@ function Backdrop() {
     <>
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.35] [background-image:linear-gradient(to_right,rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.045)_1px,transparent_1px)] [background-size:56px_56px]"
+        className="pointer-events-none absolute inset-0 [background-image:linear-gradient(to_right,var(--grid)_1px,transparent_1px),linear-gradient(to_bottom,var(--grid)_1px,transparent_1px)] [background-size:56px_56px]"
       />
       <div
         aria-hidden
@@ -124,7 +124,7 @@ function ChooseStep({ onPick }: { onPick: (mode: Mode) => void }) {
             transition={{ type: 'spring', stiffness: 420, damping: 30 }}
             className={cn(panel, 'group h-full w-full text-left transition-colors hover:border-brand/30')}
           >
-            <div className="mb-4 inline-flex size-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] transition-colors group-hover:border-brand/40 group-hover:bg-brand/10">
+            <div className="mb-4 inline-flex size-11 items-center justify-center rounded-xl border border-hairline bg-panel-2 transition-colors group-hover:border-brand/40 group-hover:bg-brand/10">
               <option.icon className="size-5 text-muted-foreground transition-colors group-hover:text-brand" />
             </div>
             <h2 className="text-lg font-medium">{option.title}</h2>
@@ -201,7 +201,7 @@ function SpecStep({ onBack, onReady }: { onBack: () => void; onReady: Onboarding
           onClick={() => inputRef.current?.click()}
           className={cn(
             'flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-12 text-center transition-colors',
-            dragging ? 'border-brand/60 bg-brand/[0.06]' : 'border-white/10 hover:border-white/20 hover:bg-white/[0.02]',
+            dragging ? 'border-brand/60 bg-brand/[0.06]' : 'border-hairline hover:border-white/20 hover:bg-panel',
           )}
         >
           {busy ? (
@@ -249,11 +249,11 @@ function SpecStep({ onBack, onReady }: { onBack: () => void; onReady: Onboarding
             </Badge>
           </div>
 
-          <div className="max-h-56 overflow-auto rounded-lg border border-white/[0.06] bg-black/30">
+          <div className="max-h-56 overflow-auto rounded-lg border border-hairline bg-inset">
             {surface.endpoints.map((endpoint) => (
               <div
                 key={`${endpoint.method}-${endpoint.path}`}
-                className="flex items-center gap-3 border-b border-white/[0.04] px-3 py-1.5 last:border-0"
+                className="flex items-center gap-3 border-b border-hairline px-3 py-1.5 last:border-0"
               >
                 <span className="w-14 shrink-0 font-mono text-[11px] font-semibold text-brand">
                   {endpoint.method}

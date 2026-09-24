@@ -1,4 +1,4 @@
-import type { HistoryEntry, Surface } from './types'
+import type { HistoryEntry, ReportData, Surface } from './types'
 
 /**
  * Reads a `text/event-stream` response, calling `onEvent` for every `data:` payload.
@@ -84,4 +84,11 @@ export async function fetchHistory(kind?: 'http' | 'llm'): Promise<HistoryEntry[
 
 export async function clearHistory(): Promise<void> {
   await fetch('/api/history', { method: 'DELETE' })
+}
+
+/** The last generated report, or null when none exists yet. */
+export async function fetchReport(): Promise<ReportData | null> {
+  const response = await fetch('/api/report')
+  if (!response.ok) return null
+  return (await response.json()) as ReportData
 }

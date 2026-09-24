@@ -97,3 +97,51 @@ export interface AgentRunSummary {
   messages: number
   error?: string
 }
+
+/* ---------------------------------------------------------------- report */
+
+export const SEVERITIES = ['Critical', 'High', 'Medium', 'Low', 'Info'] as const
+export type Severity = (typeof SEVERITIES)[number]
+
+export interface ReportFinding {
+  id: string
+  title: string
+  severity: Severity
+  category: string
+  method: string
+  endpoint: string
+  impact: string
+  evidence: string
+  remediation: string
+  owasp: string
+  cwe: string
+  confidence: 'High' | 'Medium' | 'Low'
+}
+
+/** Which slice the report is currently filtered to, driven by clicking a chart. */
+export interface ReportFilter {
+  kind: 'severity' | 'category'
+  value: string
+}
+
+export interface ReportData {
+  meta: {
+    target: string
+    title: string
+    verdict: string
+    summary: string
+    generatedAt: string
+    model: string
+  }
+  score: { value: number; grade: string; rationale: string }
+  stats: {
+    endpointsExplored: number
+    vulnerabilitiesFound: number
+    bySeverity: Record<Severity, number>
+  }
+  distribution: Array<{ severity: Severity; count: number }>
+  topTypes: Array<{ type: string; count: number; description: string }>
+  findings: ReportFinding[]
+  coverage: { tested: string[]; notCovered: string[] }
+  recommendations: Array<{ priority: string; action: string }>
+}

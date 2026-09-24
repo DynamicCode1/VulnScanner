@@ -22,13 +22,13 @@ export function CodeBlock({ text, tone = 'default', className, maxHeight = '18re
   }
 
   return (
-    <div className={cn('group relative rounded-lg border border-white/[0.06] bg-black/40', className)}>
+    <div className={cn('group relative rounded-lg border border-hairline bg-inset', className)}>
       {copyable && (
         <button
           type="button"
           onClick={copy}
           aria-label="Copy"
-          className="absolute right-2 top-2 rounded-md border border-white/10 bg-white/[0.06] p-1.5 text-muted-foreground opacity-0 transition hover:bg-white/10 hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+          className="absolute right-2 top-2 rounded-md border border-hairline bg-panel-3 p-1.5 text-muted-foreground opacity-0 transition hover:bg-white/10 hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
         >
           {copied ? <Check className="size-3.5 text-brand" /> : <Copy className="size-3.5" />}
         </button>

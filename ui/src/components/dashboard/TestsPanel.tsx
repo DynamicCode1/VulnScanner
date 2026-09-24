@@ -1,12 +1,11 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { AlertTriangle, Check, ChevronRight, CircleDashed, Loader2, MinusCircle } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { CodeBlock } from '@/components/shared/CodeBlock'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { severityTone, statusTone } from '@/lib/severity'
 import type { CheckState } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -20,14 +19,24 @@ interface TestsPanelProps {
 
 export function TestsPanel({ checks, running, summary, error }: TestsPanelProps) {
   const [selected, setSelected] = useState<CheckState | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
   const done = checks.filter((entry) => entry.status === 'done').length
   const total = checks.length
   const percent = total === 0 ? 0 : Math.round((done / total) * 100)
+  const activeIndex = checks.findIndex((entry) => entry.status === 'running')
+
+  // Follow the sweep. `nearest` keeps movement small, and the smooth scroll lags the
+  // reveal slightly — that lag is what reads as a scan rather than a jump cut.
+  useEffect(() => {
+    if (!running || activeIndex < 0) return
+    const row = listRef.current?.querySelector<HTMLElement>(`[data-index="${activeIndex}"]`)
+    row?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [activeIndex, running])
 
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/[0.06] px-3 py-2">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-hairline px-3 py-2">
         <div className="flex items-center gap-2">
           <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Automated checks</h2>
           {total > 0 && (
@@ -37,18 +46,27 @@ export function TestsPanel({ checks, running, summary, error }: TestsPanelProps)
           )}
         </div>
 
-        {summary && !running && (
-          <div className="flex items-center gap-1.5">
-            <SummaryChip tone="bad" value={summary.vulnerable} label="hit" />
-            <SummaryChip tone="good" value={summary.clean} label="clear" />
-            {summary.errored > 0 && <SummaryChip tone="warn" value={summary.errored} label="error" />}
-            <span className="ml-1 font-mono text-[11px] text-muted-foreground">{summary.durationMs}ms</span>
-          </div>
-        )}
+        <div className="flex items-center gap-1.5">
+          {running && total > 0 && (
+            <span className="flex items-center gap-1.5 text-[11px] text-brand">
+              <Loader2 className="size-3 animate-spin" />
+              scanning
+            </span>
+          )}
+
+          {summary && !running && (
+            <>
+              <SummaryChip tone="bad" value={summary.vulnerable} label="hit" />
+              <SummaryChip tone="good" value={summary.clean} label="clear" />
+              {summary.errored > 0 && <SummaryChip tone="warn" value={summary.errored} label="error" />}
+              <span className="ml-1 font-mono text-[11px] text-muted-foreground">{summary.durationMs}ms</span>
+            </>
+          )}
+        </div>
       </div>
 
       {(running || percent > 0) && (
-        <Progress value={percent} className="h-0.5 shrink-0 rounded-none bg-white/[0.06]" />
+        <Progress value={percent} className="h-0.5 shrink-0 rounded-none bg-panel-3" />
       )}
 
       {error && (
@@ -58,7 +76,7 @@ export function TestsPanel({ checks, running, summary, error }: TestsPanelProps)
         </div>
       )}
 
-      <ScrollArea className="min-h-0 flex-1">
+      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto">
         {checks.length === 0 ? (
           <EmptyTests running={running} />
         ) : (
@@ -70,7 +88,7 @@ export function TestsPanel({ checks, running, summary, error }: TestsPanelProps)
             </AnimatePresence>
           </ul>
         )}
-      </ScrollArea>
+      </div>
 
       <CheckDetail entry={selected} onClose={() => setSelected(null)} />
     </section>
@@ -110,19 +128,16 @@ function CheckRow({ entry, onOpen }: { entry: CheckState; onOpen: () => void }) 
   const failed = Boolean(outcome?.error)
 
   return (
-    <motion.li
-      layout="position"
-      initial={{ opacity: 0, y: -4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-    >
+    // No layout animation here: all rows mount at once and only their status changes,
+    // so measuring 134 of them on every reveal tick would cost more than it shows.
+    <li data-index={meta.index}>
       <button
         type="button"
         onClick={onOpen}
         disabled={status !== 'done'}
         className={cn(
           'group flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors',
-          status === 'done' ? 'hover:bg-white/[0.04]' : 'cursor-default',
+          status === 'done' ? 'hover:bg-panel-2' : 'cursor-default',
         )}
       >
         <StatusIcon status={status} hit={hit} failed={failed} />
@@ -147,7 +162,7 @@ function CheckRow({ entry, onOpen }: { entry: CheckState; onOpen: () => void }) 
             className="shrink-0"
           >
             {failed ? (
-              <Badge variant="outline" className="h-5 border-white/10 px-1.5 text-[11px] text-muted-foreground">
+              <Badge variant="outline" className="h-5 border-hairline px-1.5 text-[11px] text-muted-foreground">
                 error
               </Badge>
             ) : hit ? (
@@ -160,7 +175,7 @@ function CheckRow({ entry, onOpen }: { entry: CheckState; onOpen: () => void }) 
             ) : (
               <Badge
                 variant="outline"
-                className="h-5 border-0 bg-white/[0.03] px-1.5 text-[11px] text-muted-foreground ring-1 ring-white/[0.06]"
+                className="h-5 border-0 bg-panel px-1.5 text-[11px] text-muted-foreground ring-1 ring-hairline"
               >
                 clear
               </Badge>
@@ -172,7 +187,7 @@ function CheckRow({ entry, onOpen }: { entry: CheckState; onOpen: () => void }) 
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5" />
         )}
       </button>
-    </motion.li>
+    </li>
   )
 }
 
@@ -215,7 +230,7 @@ function CheckDetail({ entry, onClose }: { entry: CheckState | null; onClose: ()
                     vulnerable
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="border-white/10 px-2 py-0.5 text-[11px] text-muted-foreground">
+                  <Badge variant="outline" className="border-hairline px-2 py-0.5 text-[11px] text-muted-foreground">
                     clear
                   </Badge>
                 )}

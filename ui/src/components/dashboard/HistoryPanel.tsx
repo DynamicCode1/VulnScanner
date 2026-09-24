@@ -34,7 +34,7 @@ export function HistoryPanel({ entries, selected, onSelect, onCleared }: History
 
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/[0.06] px-3 py-2">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-hairline px-3 py-2">
         <div className="flex items-center gap-2">
           <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">History</h2>
           <span className="font-mono text-[11px] text-muted-foreground">{entries.length}</span>
@@ -110,7 +110,7 @@ function HistoryRow({ entry, active, onClick }: { entry: HistoryEntry; active: b
         whileTap={{ scale: 0.995 }}
         className={cn(
           'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
-          active ? 'bg-brand/[0.09] ring-1 ring-brand/25' : 'hover:bg-white/[0.04]',
+          active ? 'bg-brand/[0.09] ring-1 ring-brand/25' : 'hover:bg-panel-2',
         )}
       >
         <span

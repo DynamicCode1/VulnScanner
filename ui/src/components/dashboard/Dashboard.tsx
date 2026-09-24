@@ -1,10 +1,10 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { AgentPanel } from '@/components/dashboard/AgentPanel'
 import { HistoryPanel } from '@/components/dashboard/HistoryPanel'
-import { ReportPanel } from '@/components/dashboard/ReportPanel'
 import { TestsPanel } from '@/components/dashboard/TestsPanel'
 import { TopBar, type TabKey } from '@/components/dashboard/TopBar'
+import { ReportDashboard } from '@/components/report/ReportDashboard'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { useAgent } from '@/hooks/useAgent'
 import { useHistory } from '@/hooks/useHistory'
@@ -51,6 +51,20 @@ export function Dashboard({ initialTarget, surface, onReset }: DashboardProps) {
 
   const surfaceLabel = surface ? `${surface.title} · ${surface.endpoints.length} endpoints` : null
 
+  // Stable identity: an inline arrow here re-triggers the report's bootstrap effect on
+  // every render, which refetches (and can regenerate) in a loop.
+  const handleReportReady = useCallback(() => setReportReady(true), [])
+
+  // `useHistory` only polls while something is in flight, so the run that just finished
+  // would otherwise never appear in the activity card or the History tab.
+  useEffect(() => {
+    if (scan.summary) void history.refresh()
+  }, [scan.summary, history.refresh])
+
+  useEffect(() => {
+    if (agent.summary) void history.refresh()
+  }, [agent.summary, history.refresh])
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-background">
       <TopBar
@@ -66,7 +80,13 @@ export function Dashboard({ initialTarget, surface, onReset }: DashboardProps) {
       />
 
       {tab === 'report' ? (
-        <ReportPanel target={target} ready={reportReady} onReady={() => setReportReady(true)} />
+        <ReportDashboard
+          target={target}
+          scan={scan}
+          history={history}
+          agent={agent}
+          onReady={handleReportReady}
+        />
       ) : (
         <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
           {/* Left column: tests on top, agent underneath — the LeetCode split. */}

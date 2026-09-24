@@ -17,7 +17,7 @@
 
 import { createAgentSession, scanPrompt } from "./agent";
 import { createHistoryFetch, handleHistoryRequest } from "./history";
-import { REPORT_PATH, generateReport } from "./report";
+import { REPORT_PATH, generateReportData, readReportData } from "./report";
 import { loadChecks, runStaticChecks } from "./staticChecker";
 import { inspectSpec, resolveApi } from "./swagger";
 
@@ -197,19 +197,26 @@ async function handleAgent(request: Request): Promise<Response> {
 }
 
 async function handleReport(request: Request): Promise<Response> {
+  // GET returns the last report so a refresh can re-render without another model call.
+  if (request.method === "GET") {
+    const data = await readReportData();
+    return data ? json(data) : json({ error: "No report generated yet." }, 404);
+  }
+
   const body = await readBody(request);
   const target = String(body.target ?? "").trim();
 
   return sse(async (send) => {
     send({ type: "status", text: "Reading findings.md and the static scan…" });
+    send({ type: "status", text: "Filling the report schema…" });
 
-    const result = await generateReport({
+    const data = await generateReportData({
       target,
       findingsPath: String(body.findingsPath ?? process.env.FINDINGS_PATH ?? "findings.md"),
       staticReport: lastScans.get(target) ?? null,
     });
 
-    send({ type: "done", url: "/report.html", model: result.model, bytes: result.html.length });
+    send({ type: "done", data });
   });
 }
 
@@ -226,7 +233,7 @@ const server = Bun.serve({
     if (pathname === "/api/spec" && request.method === "POST") return handleSpec(request);
     if (pathname === "/api/scan" && request.method === "POST") return handleScan(request);
     if (pathname === "/api/agent" && request.method === "POST") return handleAgent(request);
-    if (pathname === "/api/report" && request.method === "POST") return handleReport(request);
+    if (pathname === "/api/report") return handleReport(request);
 
     if (pathname === "/report.html" && request.method === "GET") {
       const file = Bun.file(REPORT_PATH);

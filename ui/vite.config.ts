@@ -20,6 +20,13 @@ export default defineConfig({
         target: 'http://127.0.0.1:5000',
         changeOrigin: true,
       },
+      // report.html is a standalone self-contained page the server writes next to itself —
+      // it is not a UI route. Without this, Vite's SPA fallback answers the link with
+      // index.html, so the "open report" links silently reload the app instead.
+      '/report.html': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+      },
     },
   },
 })
