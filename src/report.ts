@@ -14,7 +14,13 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { createDeepSeek } from "./agent";
 
-export const REPORT_PATH = "report.html";
+export const REPORT_PATH = process.env.REPORT_HTML ?? "report.html";
+/**
+ * A second, always-present copy of the export. It is rewritten on EVERY generation —
+ * including when the model is unreachable — so a demo can open `/final-report.html`
+ * without depending on DeepSeek at request time.
+ */
+export const FINAL_REPORT_PATH = process.env.FINAL_REPORT_PATH ?? "final-report.html";
 export const REPORT_JSON = process.env.REPORT_JSON ?? "data/report.json";
 
 /** Enough to describe everything, bounded so the request stays cheap. */
@@ -292,7 +298,7 @@ function escapeHtml(value: string): string {
 }
 
 /** Deterministic export — same data as the dashboard, no extra model call. */
-export function renderReportHtml(data: ReportData): string {
+export function renderReportHtml(data: ReportData, note?: string): string {
   const chips = SEVERITIES.filter((severity) => data.stats.bySeverity[severity] > 0)
     .map(
       (severity) =>
@@ -340,6 +346,7 @@ ul{margin:.4rem 0;padding-left:1.2rem}
 <h1>${escapeHtml(data.meta.title)}</h1>
 <p class="muted">${escapeHtml(data.meta.target)} · generated ${escapeHtml(data.meta.generatedAt)} with ${escapeHtml(data.meta.model)}</p>
 <p><strong>${escapeHtml(data.meta.verdict)}</strong></p>
+${note ? `<p class="muted">${escapeHtml(note)}</p>` : ""}
 
 <div class="stats">
   <div class="stat"><b>${data.score.value}<span class="muted" style="font-size:1rem">/100</span></b>Score · grade ${escapeHtml(data.score.grade)}</div>
@@ -421,7 +428,27 @@ function fallbackReport(input: ReportInput, reason: string): ReportData {
   };
 }
 
-export async function generateReportData(input: ReportInput): Promise<ReportData> {
+/** Shown on the always-present copy so it is obvious it needs no model call. */
+const STATIC_NOTE =
+  "Static export — written on every generation and readable with no backend running. Kept at /final-report.html as a fallback when the model is unavailable.";
+
+/** The static copy kept at `/final-report.html`. */
+export function renderFinalReportHtml(data: ReportData): string {
+  return renderReportHtml(data, STATIC_NOTE);
+}
+
+/** Writes the saved data, the dashboard export and the always-on static copy. */
+async function writeReportFiles(data: ReportData): Promise<void> {
+  await mkdir(dirname(REPORT_JSON), { recursive: true });
+  await mkdir(dirname(REPORT_PATH), { recursive: true });
+  await mkdir(dirname(FINAL_REPORT_PATH), { recursive: true });
+  await writeFile(REPORT_JSON, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+  await writeFile(REPORT_PATH, renderReportHtml(data), "utf8");
+  await writeFile(FINAL_REPORT_PATH, renderFinalReportHtml(data), "utf8");
+}
+
+/** The model-filled report. Throws when the provider is unreachable or answers unusably. */
+async function narrativeReport(input: ReportInput): Promise<ReportData> {
   const { models, model } = createDeepSeek();
   const modelId = String((model as { id?: string }).id ?? "unknown");
 
@@ -453,21 +480,23 @@ export async function generateReportData(input: ReportInput): Promise<ReportData
     .map((part) => part.text)
     .join("");
 
+  return normalize(extractJson(reply) as Record<string, unknown>, input.target, modelId);
+}
+
+export async function generateReportData(input: ReportInput): Promise<ReportData> {
   let data: ReportData;
   try {
-    data = normalize(extractJson(reply) as Record<string, unknown>, input.target, modelId);
+    data = await narrativeReport(input);
   } catch (error) {
-    // Never leave the dashboard empty because the model rambled.
+    // A dead key, an unreachable provider or a rambling model must not leave the dashboard
+    // empty — the deterministic data is already a usable report, so export that instead.
     data = fallbackReport(
       input,
-      `The narrative report could not be parsed (${error instanceof Error ? error.message : String(error)}). Falling back to the static results.`,
+      `The narrative report could not be generated (${error instanceof Error ? error.message : String(error)}). Falling back to the static results.`,
     );
   }
 
-  await mkdir(dirname(REPORT_JSON), { recursive: true });
-  await writeFile(REPORT_JSON, `${JSON.stringify(data, null, 2)}\n`, "utf8");
-  await writeFile(REPORT_PATH, renderReportHtml(data), "utf8");
-
+  await writeReportFiles(data);
   return data;
 }
 

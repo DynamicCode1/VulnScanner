@@ -27,6 +27,11 @@ export default defineConfig({
         target: 'http://127.0.0.1:5000',
         changeOrigin: true,
       },
+      // Same for the static export kept as a fallback when the model is unavailable.
+      '/final-report.html': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+      },
     },
   },
 })

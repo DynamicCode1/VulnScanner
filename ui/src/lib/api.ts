@@ -31,36 +31,53 @@ export async function streamSse<T>(
     throw new Error(message)
   }
 
+  if (response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'text/event-stream') {
+    throw new Error('The server did not return an event stream.')
+  }
   if (!response.body) throw new Error('The server returned no stream.')
 
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
 
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
+  const cancelReader = () => { void reader.cancel().catch(() => {}) }
+  signal?.addEventListener('abort', cancelReader, { once: true })
 
-    buffer += decoder.decode(value, { stream: true })
+  try {
+    for (;;) {
+      signal?.throwIfAborted()
+      const { done, value } = await reader.read()
+      signal?.throwIfAborted()
+      if (done) break
 
-    let boundary = buffer.indexOf('\n\n')
-    while (boundary !== -1) {
-      const chunk = buffer.slice(0, boundary)
-      buffer = buffer.slice(boundary + 2)
+      buffer += decoder.decode(value, { stream: true })
 
-      for (const line of chunk.split('\n')) {
-        if (!line.startsWith('data:')) continue
-        const payload = line.slice(5).trim()
-        if (!payload) continue
-        try {
-          onEvent(JSON.parse(payload) as T)
-        } catch {
-          // A malformed frame is not worth killing the stream over.
+      let boundary = buffer.indexOf('\n\n')
+      while (boundary !== -1) {
+        const chunk = buffer.slice(0, boundary)
+        buffer = buffer.slice(boundary + 2)
+
+        for (const line of chunk.split('\n')) {
+          if (!line.startsWith('data:')) continue
+          const payload = line.slice(5).trim()
+          if (!payload) continue
+          let event: T
+          try {
+            event = JSON.parse(payload) as T
+          } catch {
+            throw new Error('The server returned an invalid event.')
+          }
+          onEvent(event)
+          signal?.throwIfAborted()
         }
-      }
 
-      boundary = buffer.indexOf('\n\n')
+        boundary = buffer.indexOf('\n\n')
+      }
     }
+  } finally {
+    signal?.removeEventListener('abort', cancelReader)
+    cancelReader()
+    reader.releaseLock()
   }
 }
 
@@ -87,8 +104,13 @@ export async function clearHistory(): Promise<void> {
 }
 
 /** The last generated report, or null when none exists yet. */
-export async function fetchReport(): Promise<ReportData | null> {
-  const response = await fetch('/api/report')
-  if (!response.ok) return null
-  return (await response.json()) as ReportData
+export async function fetchReport(signal?: AbortSignal): Promise<ReportData | null> {
+  const response = await fetch('/api/report', { signal })
+  if (response.status === 404) return null
+  if (!response.ok) throw new Error(`Could not load the saved report (${response.status}).`)
+  const report = await response.json() as ReportData | null
+  if (!report || typeof report.meta?.target !== 'string') {
+    throw new Error('The saved report is invalid. Please generate a new report.')
+  }
+  return report
 }

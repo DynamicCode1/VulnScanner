@@ -15,6 +15,7 @@ node_modules/
 findings.md
 findings.*.md
 report.html
+final-report.html
 plan.md
 
 # The probe/model-call log and the saved conversations. Both are runtime state:

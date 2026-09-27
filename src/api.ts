@@ -10,6 +10,7 @@
  *   POST /api/report    turn findings.md + the scan into report.html
  *   GET  /api/history   every probe and every model call
  *   GET  /report.html   the generated report
+ *   GET  /final-report.html  the same report as a static export, kept even if the model fails
  *
  * The two long-running routes stream over SSE so the UI can show tests completing one
  * by one and the agent's tokens as they arrive, rather than waiting on one big response.
@@ -17,7 +18,7 @@
 
 import { createAgentSession, scanPrompt } from "./agent";
 import { createHistoryFetch, handleHistoryRequest } from "./history";
-import { REPORT_PATH, generateReportData, readReportData } from "./report";
+import { FINAL_REPORT_PATH, REPORT_PATH, generateReportData, readReportData, renderReportHtml } from "./report";
 import { loadChecks, runStaticChecks } from "./staticChecker";
 import { inspectSpec, resolveApi } from "./swagger";
 
@@ -235,10 +236,16 @@ const server = Bun.serve({
     if (pathname === "/api/agent" && request.method === "POST") return handleAgent(request);
     if (pathname === "/api/report") return handleReport(request);
 
-    if (pathname === "/report.html" && request.method === "GET") {
-      const file = Bun.file(REPORT_PATH);
-      if (!(await file.exists())) return json({ error: "No report generated yet." }, 404);
-      return new Response(file, { headers: { "content-type": "text/html; charset=utf-8" } });
+    if ((pathname === "/report.html" || pathname === "/final-report.html") && request.method === "GET") {
+      const file = Bun.file(pathname === "/final-report.html" ? FINAL_REPORT_PATH : REPORT_PATH);
+      if (await file.exists()) {
+        return new Response(file, { headers: { "content-type": "text/html; charset=utf-8" } });
+      }
+      // Both files are written by every generation. If one was cleaned out, re-render it
+      // from the saved data rather than 404 a link someone is about to open.
+      const data = await readReportData();
+      if (!data) return json({ error: "No report generated yet." }, 404);
+      return new Response(renderReportHtml(data), { headers: { "content-type": "text/html; charset=utf-8" } });
     }
 
     const history = await handleHistoryRequest(request);
@@ -255,3 +262,4 @@ console.log(`  POST   /api/agent               agent run / chat (SSE)`);
 console.log(`  POST   /api/report              generate report.html`);
 console.log(`  GET    /api/history             every probe and model call`);
 console.log(`  GET    /report.html             the generated report`);
+console.log(`  GET    /final-report.html       static export, independent of the model`);

@@ -25,6 +25,9 @@ import { fetchReport, streamSse } from '@/lib/api'
 import type { ReportData, ReportFilter, ReportFinding } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
+const REPORT_CACHE_TIMEOUT_MS = 15_000
+const REPORT_GENERATION_TIMEOUT_MS = 180_000
+
 type ReportTab = 'overview' | 'findings' | 'history'
 
 type GenerateEvent =
@@ -40,7 +43,11 @@ interface ReportDashboardProps {
   onReady?: () => void
 }
 
-export function ReportDashboard({ target, scan, history, agent, onReady }: ReportDashboardProps) {
+export function ReportDashboard(props: ReportDashboardProps) {
+  return <ReportDashboardContent key={props.target} {...props} />
+}
+
+function ReportDashboardContent({ target, scan, history, agent, onReady }: ReportDashboardProps) {
   const [data, setData] = useState<ReportData | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -48,55 +55,91 @@ export function ReportDashboard({ target, scan, history, agent, onReady }: Repor
   const [selected, setSelected] = useState<ReportFinding | null>(null)
   const [filter, setFilter] = useState<ReportFilter | null>(null)
 
-  const generate = useCallback(async () => {
-    setStatus('Generating report…')
+  const activeRequest = useRef<AbortController | null>(null)
+
+  const loadReport = useCallback(async (reuseCache: boolean) => {
+    activeRequest.current?.abort()
+    const controller = new AbortController()
+    activeRequest.current = controller
+    const isCurrent = () => activeRequest.current === controller && !controller.signal.aborted
+    let terminal = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const startDeadline = (milliseconds: number, message: string) => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        if (!isCurrent() || terminal) return
+        setError(message)
+        setStatus(null)
+        controller.abort()
+      }, milliseconds)
+    }
+    const clearDeadline = () => clearTimeout(timer)
+    controller.signal.addEventListener('abort', clearDeadline, { once: true })
     setError(null)
+    setStatus(reuseCache ? 'Loading saved report…' : 'Generating report…')
+
     try {
-      await streamSse<GenerateEvent>('/api/report', { target }, (event) => {
-        if (event.type === 'status') setStatus(event.text)
-        else if (event.type === 'done') {
-          setData(event.data)
-          setStatus(null)
+      if (reuseCache) {
+        startDeadline(REPORT_CACHE_TIMEOUT_MS, 'Loading the saved report timed out. Please try again.')
+        const existing = await fetchReport(controller.signal)
+        if (!isCurrent()) return
+        if (existing && existing.meta.target === target) {
+          setData(existing)
           onReady?.()
-        } else if (event.type === 'error') {
-          setError(event.message)
-          setStatus(null)
+          return
         }
-      })
+      }
+
+      setStatus('Generating report…')
+      startDeadline(REPORT_GENERATION_TIMEOUT_MS, 'Report generation timed out. Please try again.')
+      await streamSse<GenerateEvent>('/api/report', { target }, (event) => {
+        if (!isCurrent() || terminal) return
+        if (event.type === 'status') setStatus(event.text)
+        else if (event.type === 'done' || event.type === 'error') {
+          terminal = true
+          clearDeadline()
+          setStatus(null)
+          if (event.type === 'done') {
+            setData(event.data)
+            onReady?.()
+          } else {
+            setError(event.message)
+          }
+          controller.abort()
+        }
+      }, controller.signal)
+      if (isCurrent() && !terminal) {
+        throw new Error('Report generation ended before a report was received. Please try again.')
+      }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught))
-      setStatus(null)
+      if (isCurrent()) setError(caught instanceof Error ? caught.message : String(caught))
+    } finally {
+      clearDeadline()
+      controller.signal.removeEventListener('abort', clearDeadline)
+      if (activeRequest.current === controller) {
+        activeRequest.current = null
+        setStatus(null)
+      }
     }
   }, [target, onReady])
 
-  // The report is built FROM a scan, so there has to be one. Generating from whatever
-  // happens to be lying around is how you get findings from a different target.
+  const generate = () => loadReport(false)
   const scanFresh = scan.scannedTarget === target && scan.summary !== null
 
-  // Reuse the last report when it is for this target; otherwise build one. The ref makes
-  // this strictly once per target — an unstable dependency here fetches on every render.
-  const bootstrappedFor = useRef<string | null>(null)
-
   useEffect(() => {
-    if (!scanFresh) return
-    if (bootstrappedFor.current === target) return
-    bootstrappedFor.current = target
-
     let cancelled = false
-    void (async () => {
-      const existing = await fetchReport().catch(() => null)
-      if (cancelled) return
-      if (existing && existing.meta.target === target) {
-        setData(existing)
-        onReady?.()
-        return
-      }
-      await generate()
-    })()
+    if (scanFresh) {
+      queueMicrotask(() => {
+        if (!cancelled) void loadReport(true)
+      })
+    }
     return () => {
       cancelled = true
+      const controller = activeRequest.current
+      activeRequest.current = null
+      controller?.abort()
     }
-  }, [target, scanFresh, generate, onReady])
+  }, [scanFresh, loadReport])
 
   const selectFinding = (finding: ReportFinding) => {
     setSelected((current) => (current?.id === finding.id ? null : finding))
@@ -146,6 +189,8 @@ export function ReportDashboard({ target, scan, history, agent, onReady }: Repor
             </Button>
           </div>
         </header>
+
+        {error && <p role="alert" className="shrink-0 px-5 py-3 text-xs text-red-300">{error}</p>}
 
         {status && (
           <div className="h-0.5 shrink-0 overflow-hidden bg-panel-3">
@@ -421,6 +466,14 @@ function GeneratingPanel({
               <RefreshCw className="size-3.5" />
               Try again
             </Button>
+            <a
+              href="/final-report.html"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 block text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Or open the static report
+            </a>
           </>
         ) : (
           <>
