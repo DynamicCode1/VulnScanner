@@ -1,8 +1,5 @@
 # SentinelAPI — Zero-Trust API Vulnerability Scanner
 
-> "Find the API vulnerability before the breach headline does."
-> AmiHacks hackathon submission by **Team 0dayTM** (Track C — Industry / Deep-Tech, Problem Statement 3).
-
 SentinelAPI scans an API target in two passes:
 
 1. **Pass 1 — Deterministic static engine:** spec-aware curl probes + regex/content matching. No LLM, no network dependency beyond the target. Fast, reproducible, explainable.
